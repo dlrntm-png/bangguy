@@ -52,7 +52,22 @@
         const d = await r.json();
         const ip = d.ip ? `IP: ${d.ip}` : 'IP: -';
         const office = d.office ? '사내망' : '사내망 아님';
-        const stamp = d.serverTime ? `시간: ${d.serverTime}` : '';
+        // 한국 시간 형식으로 변환 (YYYY-MM-DD HH:mm:ss)
+        let stamp = '';
+        if (d.serverTime) {
+          const date = new Date(d.serverTime);
+          const koreaTime = date.toLocaleString('ko-KR', { 
+            timeZone: 'Asia/Seoul',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          });
+          stamp = `시간: ${koreaTime}`;
+        }
         if (d.ok) {
           resBox.innerHTML = `✅ ${d.message || '등록 완료'}<br>${ip} / ${office}<br>${stamp}`;
         } else {

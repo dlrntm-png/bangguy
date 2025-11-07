@@ -77,6 +77,14 @@ function isOfficeIp(clientIp) {
   return false;
 }
 
+// 한국 시간(KST, UTC+9)을 ISO 형식으로 반환
+function getKoreaTime() {
+  const now = new Date();
+  // 한국 시간으로 변환 (UTC+9)
+  const koreaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  return koreaTime.toISOString();
+}
+
 // 현재 접속 IP/사내망 여부 제공(처음부터 차단하지 않음)
 app.get('/ip-status', (req, res) => {
   const ip = getClientIp(req);
@@ -88,7 +96,7 @@ app.get('/ip-status', (req, res) => {
 app.post('/attend/register', upload.single('photo'), async (req, res) => {
   const ip = getClientIp(req);
   const office = isOfficeIp(ip);
-  const serverTime = new Date().toISOString();
+  const serverTime = getKoreaTime();
 
   const employeeId = String(req.body.employeeId || '').trim();
   const name = String(req.body.name || '').trim();
