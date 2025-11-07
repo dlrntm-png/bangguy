@@ -1,6 +1,6 @@
 # 출퇴근 인증 시스템 (Next.js + Vercel)
 
-사번, 이름, 사진을 기반으로 출퇴근을 기록하고, 요청자의 공인 IP가 사내망에 속하는지 판정하는 시스템입니다. 기존 Express 서버 구조를 Vercel에서 동작하도록 전면 개편하여 **서버리스 함수 + Vercel Postgres + Vercel Blob** 조합으로 동작합니다.
+사번, 이름, 사진을 기반으로 출퇴근을 기록하고, 요청자의 공인 IP가 사내망에 속하는지 판정하는 시스템입니다. 기존 Express 서버 구조를 Vercel에서 동작하도록 전면 개편하여 **서버리스 함수 + Supabase Postgres + Vercel Blob** 조합으로 동작합니다.
 
 ## 핵심 기능
 - **사내망 판정**: `OFFICE_IPS` 화이트리스트(CIDR 지원)를 사용하여 접속 IP의 사내망 여부 판단
@@ -19,7 +19,7 @@
 ## 기술 스택
 - **Frontend**: 정적 HTML (`public/index.html`, `public/admin.html`)
 - **Backend**: Next.js API Routes (서버리스 함수)
-- **Storage**: Vercel Postgres (메타데이터), Vercel Blob (이미지 파일)
+- **Storage**: Supabase Postgres (메타데이터), Vercel Blob (이미지 파일)
 - **인증**: 관리자 JWT (24시간 만료)
 
 ## 프로젝트 구조
@@ -43,9 +43,10 @@
 | `ADMIN_PASSWORD` | 관리자 로그인용 비밀번호 (예: `superSecret123!`)
 | `ADMIN_JWT_SECRET` | 관리자 JWT 서명용 시크릿 문자열 (임의의 긴 문자열)
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 프로젝트에서 발급한 Read/Write 토큰 |
-| `POSTGRES_URL` | Vercel Postgres 연결 문자열 (예: Vercel Dashboard에서 발급) |
+| `POSTGRES_URL` | Supabase Postgres 연결 문자열 (`postgres://...`) |
+| `POSTGRES_SSL` | (선택) `disable` 또는 `require` 등 SSL 모드 지정, 기본값 `require` |
 
-> **로컬 개발 시** Vercel Postgres/Blob 대신 Supabase, R2, S3 등을 사용하고 싶다면 `lib/` 내부 헬퍼를 교체하면 됩니다.
+> **로컬 개발 시** `.env.local` 에 Supabase Connection string을 그대로 넣으면 동일하게 동작합니다.
 
 ## 로컬 개발
 ```bash
@@ -65,10 +66,11 @@ npm run dev
    - `ADMIN_PASSWORD`
    - `ADMIN_JWT_SECRET`
    - `BLOB_READ_WRITE_TOKEN` (Vercel Blob 대시보드에서 발급)
-   - `POSTGRES_URL` (Vercel Postgres 추가 후 Connection String 사용)
-3. **Blob & Postgres 연결**
-   - Vercel Dashboard → Storage → Blob / Postgres에서 신규 인스턴스 생성
-   - 생성 시 `Read/Write Token`, `POSTGRES_URL`을 환경 변수에 복사
+   - `POSTGRES_URL` (Supabase Dashboard → Project Settings → Database → Connection string → `URI` 항목)
+   - (선택) `POSTGRES_SSL` (`require`/`prefer`/`disable` 등 Supabase 정책에 맞게 지정)
+3. **Blob & DB 연결**
+   - Vercel Dashboard → Storage → Blob 에서 Read/Write Token 발급 → 환경 변수 저장
+   - Supabase → Database 인스턴스 생성 → Connection string을 `POSTGRES_URL`로 설정
 4. **추가 설정** (선택)
    - Team/Pro 플랜이 아니라면 이미지 용량 제한(5MB)과 Blob 사용량을 모니터링하세요.
    - `vercel-build` 스크립트는 `next build`로 구성되어 있으므로 추가 설정 불필요
@@ -105,13 +107,19 @@ npm run dev
 ## 운영/모니터링 팁
 - **로그 확인**: Vercel Functions 로그에서 API 호출 오류를 확인할 수 있습니다.
 - **Blob 용량 관리**: 불필요한 기록을 주기적으로 정리하여 저장 공간 절약
-- **Postgres 백업**: Vercel Postgres는 자동 백업을 제공하지만, 주기적 CSV 다운로드를 권장
+- **Postgres 백업**: Supabase는 PITR/백업 기능을 제공하므로 콘솔에서 주기적으로 백업 설정을 확인
 - **보안**: `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`은 강력한 값으로 설정하고 주기적으로 교체
 - **IP 화이트리스트**: 사내 IP 대역 변경 시 `OFFICE_IPS` 환경 변수를 업데이트 후 재배포
 
+## Supabase 설정 요약
+1. [Supabase](https://supabase.com) 프로젝트를 생성합니다.
+2. `Project Settings → Database → Connection string`에서 `URI` 값을 복사합니다.
+3. Vercel 프로젝트의 `Settings → Environment Variables`에 `POSTGRES_URL` (필수), `POSTGRES_SSL`(선택) 값을 입력하고 저장합니다.
+4. 재배포 후 `/api/attend/register` 호출 시 Supabase에 출퇴근 기록이 저장됩니다.
+
 ## 마이그레이션 참고 (이전 Express 버전 → Vercel 버전)
 - 로컬 디스크에 저장하던 업로드 파일 → Vercel Blob
-- CSV 기반 기록 관리 → Postgres 테이블 보관
+- CSV 기반 기록 관리 → Supabase Postgres 테이블 보관
 - Express 서버 → Next.js API Routes (자동 확장 & 서버리스 실행)
 - 관리자 토큰 메모리 저장 → JWT 기반(멱등), 서버리스 환경에서도 유지
 
@@ -120,7 +128,7 @@ npm run dev
 | --- | --- |
 | `Error: BLOB_READ_WRITE_TOKEN` | Vercel Blob RW 토큰이 미설정 → 대시보드에서 발급 후 환경 변수 추가 |
 | `Error: ADMIN_JWT_SECRET` | 관리자 JWT 비밀키 미설정 → `.env.local` 또는 Vercel 환경 변수에 추가 |
-| `ETIMEDOUT` / DB 연결 오류 | `POSTGRES_URL` 오타, 권한 문제, Vercel Postgres 인스턴스 상태 확인 |
+| `ETIMEDOUT` / DB 연결 오류 | `POSTGRES_URL` 오타, 권한 문제, Supabase 인스턴스 상태/방화벽 확인 |
 | 이미지 미리보기 실패 | Blob 접근 권한 확인 (기본 `public`로 업로드), URL 차단 여부 확인 |
 | 등록 시 500 오류 | Vercel Functions 로그 확인 → Blob/DB 토큰, IP 리스트, 요청 본문 검증 |
 
