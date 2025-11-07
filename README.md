@@ -13,11 +13,13 @@
 PORT=3000
 TRUST_PROXY=loopback
 OFFICE_IPS=203.0.113.10,198.51.100.20,203.0.113.0/24
+ADMIN_PASSWORD=admin123
 ```
 
 설명:
 - `TRUST_PROXY`: 로드밸런서/NGINX 뒤라면 해당 프록시만 신뢰하도록 설정
 - `OFFICE_IPS`: 사내 공인 IP 화이트리스트(단일 IP 또는 CIDR, 쉼표 구분)
+- `ADMIN_PASSWORD`: 관리자 비밀번호 (기본값: admin123)
 
 ## 실행
 ```
@@ -28,8 +30,37 @@ npm run start
 실행 후 `http://localhost:3000` 접속 → 초기 화면에서 현재 IP/사내망 여부 확인 → 사번/이름/사진 등록
 
 ## 엔드포인트
+
+### 일반 사용자
 - `GET /ip-status`: 현재 요청의 공인 IP 및 사내망 여부 반환 `{ ip, office }`
 - `POST /attend/register`: 사번/이름/사진 등록. 응답에 `{ ok, ip, office, message }` 포함
+
+### 관리자
+- `POST /admin/login`: 관리자 로그인 (비밀번호 필요)
+- `GET /admin/check`: 관리자 토큰 확인
+- `GET /admin/records`: 등록 기록 조회 (사번 필터링 가능)
+- `POST /admin/update-device`: 기기 ID 업데이트 (다른 기기에서 등록된 경우)
+- `GET /admin/download-csv`: CSV 파일 다운로드
+
+## 관리자 페이지
+
+관리자 페이지에 접속하여 등록 기록을 조회하고 기기 ID를 업데이트할 수 있습니다.
+
+### 접속 방법
+1. 브라우저에서 접속: `http://localhost:3000/admin.html`
+2. 관리자 비밀번호 입력 (기본값: `admin123`)
+3. 로그인 후 다음 기능 사용 가능:
+   - **등록 기록 조회**: 전체 또는 사번별 조회
+   - **기기 ID 업데이트**: 다른 기기에서 등록된 기록이 있는 경우 새 기기 ID로 업데이트
+   - **CSV 다운로드**: 등록 기록을 CSV 파일로 다운로드
+
+### 기기 ID 업데이트 방법
+1. 관리자 페이지 접속
+2. "기기 ID 업데이트" 섹션에서:
+   - 사번 입력
+   - 새 기기 ID 입력 (사용자가 localStorage에서 확인한 기기 ID)
+3. "기기 ID 업데이트" 버튼 클릭
+4. 업데이트 완료 후 해당 사번으로 다시 등록 가능
 
 ## 버전 관리 (Git)
 

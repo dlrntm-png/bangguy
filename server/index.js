@@ -299,9 +299,151 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
   return res.json({ ok: true, ip, office, file: saveName, serverTime, message: '인증(등록) 완료' });
 });
 
+// ==================== 관리자 기능 ====================
+
+// 관리자 비밀번호 (환경변수에서 로드, 기본값: admin123)
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+// 간단한 토큰 저장 (운영 환경에서는 Redis 등 사용 권장)
+const adminTokens = new Set();
+
+// 관리자 인증 미들웨어
+function requireAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ ok: false, message: '인증이 필요합니다.' });
+  }
+  const token = authHeader.substring(7);
+  if (!adminTokens.has(token)) {
+    return res.status(401).json({ ok: false, message: '유효하지 않은 토큰입니다.' });
+  }
+  next();
+}
+
+// 관리자 로그인
+app.post('/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    const token = crypto.randomBytes(32).toString('hex');
+    adminTokens.add(token);
+    // 토큰은 24시간 후 만료 (간단한 구현)
+    setTimeout(() => adminTokens.delete(token), 24 * 60 * 60 * 1000);
+    return res.json({ ok: true, token, message: '로그인 성공' });
+  }
+  return res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' });
+});
+
+// 관리자 토큰 확인
+app.get('/admin/check', requireAdmin, (req, res) => {
+  res.json({ ok: true, message: '인증됨' });
+});
+
+// 등록 기록 조회
+app.get('/admin/records', requireAdmin, (req, res) => {
+  try {
+    if (!fs.existsSync(logFile)) {
+      return res.json({ ok: true, records: [] });
+    }
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n').filter(line => line.trim());
+    const headers = lines[0].split(',');
+    const records = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 8) {
+        const record = {
+          server_time: cols[0],
+          employee_id: cols[1],
+          name: cols[2],
+          ip: cols[3],
+          file: cols[4],
+          office: cols[5],
+          device_id: cols[6],
+          image_hash: cols[7]
+        };
+        
+        // 사번 필터링
+        const empId = req.query.employeeId;
+        if (!empId || record.employee_id === empId) {
+          records.push(record);
+        }
+      }
+    }
+    
+    // 최신순 정렬
+    records.reverse();
+    
+    return res.json({ ok: true, records });
+  } catch (err) {
+    console.error('기록 조회 오류:', err);
+    return res.status(500).json({ ok: false, message: '기록 조회 실패' });
+  }
+});
+
+// 기기 ID 업데이트
+app.post('/admin/update-device', requireAdmin, (req, res) => {
+  const { employeeId, deviceId } = req.body;
+  
+  if (!employeeId || !deviceId) {
+    return res.status(400).json({ ok: false, message: '사번과 기기 ID를 모두 입력해주세요.' });
+  }
+  
+  try {
+    if (!fs.existsSync(logFile)) {
+      return res.status(404).json({ ok: false, message: '등록 기록이 없습니다.' });
+    }
+    
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n');
+    let updated = 0;
+    const safeDeviceId = deviceId.replace(/,|\r|\n/g, '_');
+    
+    // 해당 사번의 모든 기록에서 기기 ID 업데이트
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 7 && cols[1] === employeeId) {
+        cols[6] = safeDeviceId; // device_id 업데이트
+        lines[i] = cols.join(',');
+        updated++;
+      }
+    }
+    
+    if (updated === 0) {
+      return res.status(404).json({ ok: false, message: '해당 사번의 등록 기록을 찾을 수 없습니다.' });
+    }
+    
+    // 파일 다시 쓰기
+    fs.writeFileSync(logFile, lines.join('\n'), { encoding: 'utf8' });
+    
+    return res.json({ ok: true, updated, message: '기기 ID가 업데이트되었습니다.' });
+  } catch (err) {
+    console.error('기기 ID 업데이트 오류:', err);
+    return res.status(500).json({ ok: false, message: '업데이트 실패' });
+  }
+});
+
+// CSV 다운로드
+app.get('/admin/download-csv', requireAdmin, (req, res) => {
+  try {
+    if (!fs.existsSync(logFile)) {
+      return res.status(404).json({ ok: false, message: 'CSV 파일이 없습니다.' });
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance_${new Date().toISOString().split('T')[0]}.csv"`);
+    const content = fs.readFileSync(logFile, 'utf8');
+    res.send(content);
+  } catch (err) {
+    console.error('CSV 다운로드 오류:', err);
+    return res.status(500).json({ ok: false, message: '다운로드 실패' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`server on :${PORT}`);
+  console.log(`관리자 페이지: http://localhost:${PORT}/admin.html`);
+  console.log(`관리자 비밀번호: ${ADMIN_PASSWORD} (환경변수 ADMIN_PASSWORD로 변경 가능)`);
 });
 
 

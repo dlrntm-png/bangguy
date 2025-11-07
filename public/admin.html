@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>관리자 페이지 - 출퇴근 관리</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; max-width: 1200px; margin: 0 auto; }
+    .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+    .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; }
+    .section h3 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f5f5f5; font-weight: bold; }
+    tr:hover { background-color: #f9f9f9; }
+    button { padding: 8px 16px; margin: 4px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+    button:hover { background: #f0f0f0; }
+    button.primary { background: #007bff; color: white; border-color: #007bff; }
+    button.primary:hover { background: #0056b3; }
+    button.danger { background: #dc3545; color: white; border-color: #dc3545; }
+    button.danger:hover { background: #c82333; }
+    input, select { padding: 6px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; }
+    .login-form { max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ddd; border-radius: 6px; }
+    .error { color: #dc3545; margin: 10px 0; }
+    .success { color: #28a745; margin: 10px 0; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <!-- 로그인 폼 -->
+  <div id="loginForm" class="login-form">
+    <h2>관리자 로그인</h2>
+    <div id="loginError" class="error hidden"></div>
+    <div>
+      <label>비밀번호</label><br />
+      <input type="password" id="adminPassword" placeholder="관리자 비밀번호" />
+    </div>
+    <button class="primary" onclick="login()">로그인</button>
+  </div>
+
+  <!-- 관리자 페이지 -->
+  <div id="adminPanel" class="hidden">
+    <div class="header">
+      <h1>출퇴근 관리자 페이지</h1>
+      <button onclick="logout()">로그아웃</button>
+    </div>
+
+    <!-- 기기 ID 업데이트 -->
+    <div class="section">
+      <h3>기기 ID 업데이트</h3>
+      <p>다른 기기에서 등록된 기록이 있는 경우, 새 기기 ID로 업데이트할 수 있습니다.</p>
+      <div>
+        <label>사번</label>
+        <input type="text" id="updateEmpId" placeholder="사번 입력" />
+        <label>새 기기 ID</label>
+        <input type="text" id="updateDeviceId" placeholder="새 기기 ID 입력" />
+        <button class="primary" onclick="updateDeviceId()">기기 ID 업데이트</button>
+      </div>
+      <div id="updateResult" class="hidden"></div>
+    </div>
+
+    <!-- 등록 기록 조회 -->
+    <div class="section">
+      <h3>등록 기록 조회</h3>
+      <div>
+        <label>사번으로 검색</label>
+        <input type="text" id="searchEmpId" placeholder="사번 (전체 조회는 비워두세요)" />
+        <button class="primary" onclick="loadRecords()">조회</button>
+        <button onclick="downloadCSV()">CSV 다운로드</button>
+      </div>
+      <div id="recordsTable"></div>
+    </div>
+  </div>
+
+  <script>
+    let adminToken = localStorage.getItem('admin_token');
+
+    // 페이지 로드 시 토큰 확인
+    if (adminToken) {
+      checkAuth();
+    } else {
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('adminPanel').classList.add('hidden');
+    }
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/admin/check', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (res.ok) {
+          document.getElementById('loginForm').classList.add('hidden');
+          document.getElementById('adminPanel').classList.remove('hidden');
+          loadRecords();
+        } else {
+          logout();
+        }
+      } catch {
+        logout();
+      }
+    }
+
+    async function login() {
+      const password = document.getElementById('adminPassword').value;
+      const errorDiv = document.getElementById('loginError');
+      
+      if (!password) {
+        errorDiv.textContent = '비밀번호를 입력해주세요.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          adminToken = data.token;
+          localStorage.setItem('admin_token', adminToken);
+          document.getElementById('loginForm').classList.add('hidden');
+          document.getElementById('adminPanel').classList.remove('hidden');
+          errorDiv.classList.add('hidden');
+          loadRecords();
+        } else {
+          errorDiv.textContent = data.message || '로그인 실패';
+          errorDiv.classList.remove('hidden');
+        }
+      } catch (e) {
+        errorDiv.textContent = '로그인 중 오류가 발생했습니다.';
+        errorDiv.classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('admin_token');
+      adminToken = null;
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('adminPanel').classList.add('hidden');
+      document.getElementById('adminPassword').value = '';
+    }
+
+    async function loadRecords() {
+      const empId = document.getElementById('searchEmpId').value.trim();
+      const url = empId ? `/admin/records?employeeId=${empId}` : '/admin/records';
+      
+      try {
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          displayRecords(data.records);
+        } else {
+          alert('기록 조회 실패: ' + (data.message || '알 수 없는 오류'));
+        }
+      } catch (e) {
+        alert('기록 조회 중 오류가 발생했습니다.');
+      }
+    }
+
+    function displayRecords(records) {
+      const tableDiv = document.getElementById('recordsTable');
+      if (!records || records.length === 0) {
+        tableDiv.innerHTML = '<p>등록 기록이 없습니다.</p>';
+        return;
+      }
+
+      let html = '<table><thead><tr><th>시간</th><th>사번</th><th>이름</th><th>IP</th><th>기기 ID</th><th>사내망</th><th>파일</th></tr></thead><tbody>';
+      records.forEach(record => {
+        html += `<tr>
+          <td>${record.server_time || '-'}</td>
+          <td>${record.employee_id || '-'}</td>
+          <td>${record.name || '-'}</td>
+          <td>${record.ip || '-'}</td>
+          <td>${record.device_id || '-'}</td>
+          <td>${record.office === 'true' ? '✅' : '❌'}</td>
+          <td>${record.file || '-'}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      tableDiv.innerHTML = html;
+    }
+
+    async function updateDeviceId() {
+      const empId = document.getElementById('updateEmpId').value.trim();
+      const newDeviceId = document.getElementById('updateDeviceId').value.trim();
+      const resultDiv = document.getElementById('updateResult');
+      
+      if (!empId || !newDeviceId) {
+        resultDiv.innerHTML = '<div class="error">사번과 새 기기 ID를 모두 입력해주세요.</div>';
+        resultDiv.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/admin/update-device', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({ employeeId: empId, deviceId: newDeviceId })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          resultDiv.innerHTML = `<div class="success">✅ 기기 ID가 성공적으로 업데이트되었습니다. (${data.updated}개 기록 업데이트)</div>`;
+          resultDiv.classList.remove('hidden');
+          loadRecords(); // 기록 새로고침
+        } else {
+          resultDiv.innerHTML = `<div class="error">❌ ${data.message || '업데이트 실패'}</div>`;
+          resultDiv.classList.remove('hidden');
+        }
+      } catch (e) {
+        resultDiv.innerHTML = '<div class="error">업데이트 중 오류가 발생했습니다.</div>';
+        resultDiv.classList.remove('hidden');
+      }
+    }
+
+    async function downloadCSV() {
+      try {
+        const res = await fetch('/admin/download-csv', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        } else {
+          alert('CSV 다운로드 실패');
+        }
+      } catch (e) {
+        alert('CSV 다운로드 중 오류가 발생했습니다.');
+      }
+    }
+  </script>
+</body>
+</html>
+
