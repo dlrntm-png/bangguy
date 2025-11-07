@@ -29,7 +29,23 @@ app.use('/', express.static(publicDir));
 // 업로드 디렉터리 준비
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-const upload = multer({ dest: uploadDir });
+
+// 파일 업로드 설정 (크기 제한: 5MB, 이미지 파일만 허용)
+const upload = multer({
+  dest: uploadDir,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    // 이미지 파일만 허용
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('이미지 파일만 업로드 가능합니다. (JPEG, PNG, GIF, WebP)'), false);
+    }
+  }
+});
 
 // 로그 디렉터리/파일 준비
 const logsDir = path.join(__dirname, 'logs');
@@ -51,11 +67,16 @@ const OFFICE_IPS = (process.env.OFFICE_IPS || '')
   .map(s => s.trim())
   .filter(Boolean);
 
-// 디버깅: 환경변수 및 로드된 IP 확인
-console.log('=== IP 화이트리스트 디버깅 ===');
-console.log('OFFICE_IPS from .env:', process.env.OFFICE_IPS);
-console.log('Loaded OFFICE_IPS array:', OFFICE_IPS);
-console.log('OFFICE_IPS count:', OFFICE_IPS.length);
+// 디버깅 모드 (환경변수로 제어)
+const DEBUG = process.env.DEBUG === 'true';
+
+// 디버깅: 환경변수 및 로드된 IP 확인 (조건부)
+if (DEBUG) {
+  console.log('=== IP 화이트리스트 디버깅 ===');
+  console.log('OFFICE_IPS from .env:', process.env.OFFICE_IPS);
+  console.log('Loaded OFFICE_IPS array:', OFFICE_IPS);
+  console.log('OFFICE_IPS count:', OFFICE_IPS.length);
+}
 
 function getClientIp(req) {
   let ip = req.ip || req.socket?.remoteAddress || '';
@@ -71,57 +92,63 @@ function getClientIp(req) {
 
 function isOfficeIp(clientIp) {
   if (!clientIp) {
-    console.log('[isOfficeIp] clientIp is empty');
+    if (DEBUG) console.log('[isOfficeIp] clientIp is empty');
     return false;
   }
   
-  console.log('[isOfficeIp] Checking IP:', clientIp);
-  console.log('[isOfficeIp] Against whitelist:', OFFICE_IPS);
+  if (DEBUG) {
+    console.log('[isOfficeIp] Checking IP:', clientIp);
+    console.log('[isOfficeIp] Against whitelist:', OFFICE_IPS);
+  }
   
   try {
     const addr = ipaddr.parse(clientIp);
-    console.log('[isOfficeIp] Parsed address kind:', addr.kind());
-    console.log('[isOfficeIp] Parsed address:', addr.toString());
+    if (DEBUG) {
+      console.log('[isOfficeIp] Parsed address kind:', addr.kind());
+      console.log('[isOfficeIp] Parsed address:', addr.toString());
+    }
     
     for (const entry of OFFICE_IPS) {
-      console.log('[isOfficeIp] Checking entry:', entry);
+      if (DEBUG) console.log('[isOfficeIp] Checking entry:', entry);
       
       if (!entry.includes('/')) {
         // 단일 IP 매칭
         const target = ipaddr.parse(entry);
-        console.log('[isOfficeIp] Single IP comparison - client:', addr.toString(), 'target:', target.toString());
+        if (DEBUG) console.log('[isOfficeIp] Single IP comparison - client:', addr.toString(), 'target:', target.toString());
         
         if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress()) {
           const v4 = addr.toIPv4Address();
           if (v4.toString() === target.toString()) {
-            console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4)');
+            if (DEBUG) console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4)');
             return true;
           }
         }
         if (addr.kind() === target.kind() && addr.toNormalizedString() === target.toNormalizedString()) {
-          console.log('[isOfficeIp] ✅ MATCH (exact match)');
+          if (DEBUG) console.log('[isOfficeIp] ✅ MATCH (exact match)');
           return true;
         }
-        console.log('[isOfficeIp] ❌ No match for single IP entry:', entry);
+        if (DEBUG) console.log('[isOfficeIp] ❌ No match for single IP entry:', entry);
         continue;
       }
       
       // CIDR 매칭
       const [range, prefix] = entry.split('/');
       const prefixLen = parseInt(prefix, 10);
-      console.log('[isOfficeIp] CIDR check - range:', range, 'prefix:', prefixLen);
-      console.log('[isOfficeIp] Address kind:', addr.kind());
+      if (DEBUG) {
+        console.log('[isOfficeIp] CIDR check - range:', range, 'prefix:', prefixLen);
+        console.log('[isOfficeIp] Address kind:', addr.kind());
+      }
       
       try {
         // parseCIDR을 사용하여 CIDR 범위 파싱
         const subnet = ipaddr.parseCIDR(entry);
-        console.log('[isOfficeIp] Parsed CIDR subnet:', subnet);
+        if (DEBUG) console.log('[isOfficeIp] Parsed CIDR subnet:', subnet);
         
         if (addr.kind() === subnet[0].kind()) {
           const matchResult = addr.match(subnet);
-          console.log('[isOfficeIp] CIDR match result (same kind):', matchResult);
+          if (DEBUG) console.log('[isOfficeIp] CIDR match result (same kind):', matchResult);
           if (matchResult) {
-            console.log('[isOfficeIp] ✅ MATCH (CIDR match)');
+            if (DEBUG) console.log('[isOfficeIp] ✅ MATCH (CIDR match)');
             return true;
           }
         }
@@ -130,24 +157,24 @@ function isOfficeIp(clientIp) {
           const v4 = addr.toIPv4Address();
           const v4Subnet = ipaddr.parseCIDR(range + '/' + prefix);
           const matchResult = v4.match(v4Subnet);
-          console.log('[isOfficeIp] CIDR match result (IPv6 mapped to IPv4):', matchResult);
+          if (DEBUG) console.log('[isOfficeIp] CIDR match result (IPv6 mapped to IPv4):', matchResult);
           if (matchResult) {
-            console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4, CIDR match)');
+            if (DEBUG) console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4, CIDR match)');
             return true;
           }
         }
       } catch (cidrErr) {
-        console.log('[isOfficeIp] CIDR parse error for entry:', entry, 'error:', cidrErr.message);
+        if (DEBUG) console.log('[isOfficeIp] CIDR parse error for entry:', entry, 'error:', cidrErr.message);
       }
-      console.log('[isOfficeIp] ❌ No match for CIDR entry:', entry);
+      if (DEBUG) console.log('[isOfficeIp] ❌ No match for CIDR entry:', entry);
     }
   } catch (err) {
     console.error('[isOfficeIp] ❌ ERROR:', err.message);
-    console.error('[isOfficeIp] Error stack:', err.stack);
+    if (DEBUG) console.error('[isOfficeIp] Error stack:', err.stack);
     return false;
   }
   
-  console.log('[isOfficeIp] ❌ No match found for IP:', clientIp);
+  if (DEBUG) console.log('[isOfficeIp] ❌ No match found for IP:', clientIp);
   return false;
 }
 
@@ -215,12 +242,52 @@ function checkDeviceBinding(employeeId, deviceId) {
   }
 }
 
+// 중복 등록 방지 함수 (같은 사번이 짧은 시간 내 중복 등록 방지)
+// 기본값: 5분 (300초) 내 중복 등록 방지
+function checkDuplicateRegistration(employeeId, timeWindowSeconds = 300) {
+  try {
+    if (!fs.existsSync(logFile)) return { allowed: true, message: null };
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n');
+    const now = new Date();
+    
+    // 최근 등록 기록 확인 (역순으로 검색)
+    for (let i = lines.length - 1; i >= 1; i--) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 1 && cols[1] === employeeId) {
+        try {
+          const lastRegistrationTime = new Date(cols[0]);
+          const diffSeconds = (now - lastRegistrationTime) / 1000;
+          
+          if (diffSeconds < timeWindowSeconds && diffSeconds >= 0) {
+            const remainingSeconds = Math.ceil(timeWindowSeconds - diffSeconds);
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            return {
+              allowed: false,
+              message: `최근에 등록하셨습니다. ${minutes}분 ${seconds}초 후에 다시 시도해주세요.`
+            };
+          }
+        } catch (dateErr) {
+          // 날짜 파싱 실패 시 무시하고 계속 진행
+          if (DEBUG) console.log('[checkDuplicateRegistration] Date parse error:', dateErr.message);
+        }
+        break; // 첫 번째 매칭만 확인
+      }
+    }
+    return { allowed: true, message: null };
+  } catch (err) {
+    if (DEBUG) console.error('[checkDuplicateRegistration] Error:', err.message);
+    return { allowed: true, message: null };
+  }
+}
+
 // 현재 접속 IP/사내망 여부 제공(처음부터 차단하지 않음)
 app.get('/ip-status', (req, res) => {
   const ip = getClientIp(req);
-  console.log('[GET /ip-status] Request from IP:', ip);
+  if (DEBUG) console.log('[GET /ip-status] Request from IP:', ip);
   const office = isOfficeIp(ip);
-  console.log('[GET /ip-status] Result - IP:', ip, 'Office:', office);
+  if (DEBUG) console.log('[GET /ip-status] Result - IP:', ip, 'Office:', office);
   res.json({ ip, office });
 });
 
@@ -234,22 +301,79 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
   const employeeId = String(req.body.employeeId || '').trim();
   const name = String(req.body.name || '').trim();
 
+  // 에러 처리 헬퍼 함수
+  const cleanupAndReturn = (status, data) => {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(status).json(data);
+  };
+
+  // 입력 검증
   if (!employeeId || !name) {
-    if (req.file) fs.unlink(req.file.path, () => {});
-    return res.status(400).json({ ok: false, error: 'INVALID_INPUT', ip, office, serverTime });
+    return cleanupAndReturn(400, { 
+      ok: false, 
+      error: 'INVALID_INPUT', 
+      message: '사번과 이름을 모두 입력해주세요.',
+      ip, 
+      office, 
+      serverTime 
+    });
   }
+  
   if (!req.file) {
-    return res.status(400).json({ ok: false, error: 'PHOTO_REQUIRED', ip, office, serverTime });
+    // Multer 에러 처리
+    if (req.fileValidationError) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'INVALID_FILE', 
+        message: req.fileValidationError,
+        ip, 
+        office, 
+        serverTime 
+      });
+    }
+    return res.status(400).json({ 
+      ok: false, 
+      error: 'PHOTO_REQUIRED', 
+      message: '사진을 선택해주세요.',
+      ip, 
+      office, 
+      serverTime 
+    });
   }
+  
   if (!deviceId) {
-    if (req.file) fs.unlink(req.file.path, () => {});
-    return res.status(400).json({ ok: false, error: 'DEVICE_ID_REQUIRED', ip, office, serverTime });
+    return cleanupAndReturn(400, { 
+      ok: false, 
+      error: 'DEVICE_ID_REQUIRED', 
+      message: '기기 ID가 필요합니다. 페이지를 새로고침해주세요.',
+      ip, 
+      office, 
+      serverTime 
+    });
+  }
+
+  // 파일 크기 검증 (추가 안전장치)
+  try {
+    const stats = fs.statSync(req.file.path);
+    if (stats.size > 5 * 1024 * 1024) {
+      return cleanupAndReturn(400, {
+        ok: false,
+        error: 'FILE_TOO_LARGE',
+        message: '파일 크기가 너무 큽니다. (최대 5MB)',
+        ip,
+        office,
+        serverTime
+      });
+    }
+  } catch (statErr) {
+    if (DEBUG) console.error('[register] File stat error:', statErr.message);
   }
 
   if (!office) {
     // 처음부터 URL 접근을 막지 않고, 결과로 상태만 안내
-    fs.unlink(req.file.path, () => {});
-    return res.status(200).json({
+    return cleanupAndReturn(200, {
       ok: false,
       reason: 'NOT_OFFICE_IP',
       message: '사내 공인 IP가 아닙니다. 사내 Wi‑Fi/VPN 접속 후 다시 시도해주세요.',
@@ -259,11 +383,23 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
     });
   }
 
-  // 1. 사진 중복 감지
+  // 1. 중복 등록 방지 (시간 기반)
+  const duplicateCheck = checkDuplicateRegistration(employeeId);
+  if (!duplicateCheck.allowed) {
+    return cleanupAndReturn(200, {
+      ok: false,
+      reason: 'DUPLICATE_REGISTRATION',
+      message: duplicateCheck.message,
+      ip,
+      office,
+      serverTime
+    });
+  }
+
+  // 2. 사진 중복 감지
   const imageHash = getImageHash(req.file.path);
   if (imageHash && isDuplicateHash(imageHash)) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(200).json({
+    return cleanupAndReturn(200, {
       ok: false,
       reason: 'DUPLICATE_PHOTO',
       message: '이미 사용된 사진입니다. 새로운 사진을 촬영해주세요.',
@@ -273,11 +409,10 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
     });
   }
 
-  // 2. 기기 ID 바인딩 확인
+  // 3. 기기 ID 바인딩 확인
   const deviceCheck = checkDeviceBinding(employeeId, deviceId);
   if (!deviceCheck.allowed) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(200).json({
+    return cleanupAndReturn(200, {
       ok: false,
       reason: 'DEVICE_MISMATCH',
       message: deviceCheck.message,
@@ -288,21 +423,75 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
   }
 
   // 파일 확장자/이름 정리 후 저장 (데모: 로컬 저장)
-  const original = req.file.originalname || 'photo.jpg';
-  const ext = path.extname(original) || '.jpg';
-  const safeEmpId = employeeId.replace(/[^a-zA-Z0-9_-]/g, '');
-  const saveName = `emp_${safeEmpId}_${Date.now()}${ext}`;
-  const savePath = path.join(uploadDir, saveName);
-  fs.renameSync(req.file.path, savePath);
+  try {
+    const original = req.file.originalname || 'photo.jpg';
+    const ext = path.extname(original) || '.jpg';
+    const safeEmpId = employeeId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const saveName = `emp_${safeEmpId}_${Date.now()}${ext}`;
+    const savePath = path.join(uploadDir, saveName);
+    fs.renameSync(req.file.path, savePath);
 
-  // TODO: DB 저장 { employeeId, name, photo_path: saveName, ip, created_at }
-  // CSV 로그 저장 (device_id, image_hash 추가)
-  const safeNameNoComma = name.replace(/,|\r|\n/g, ' ');
-  const safeDeviceId = deviceId.replace(/,|\r|\n/g, '_');
-  const line = `${serverTime},${safeEmpId},${safeNameNoComma},${ip},${saveName},${office},${safeDeviceId},${imageHash || ''}\n`;
-  try { fs.appendFileSync(logFile, line, { encoding: 'utf8' }); } catch {}
+    // TODO: DB 저장 { employeeId, name, photo_path: saveName, ip, created_at }
+    // CSV 로그 저장 (device_id, image_hash 추가)
+    const safeNameNoComma = name.replace(/,|\r|\n/g, ' ');
+    const safeDeviceId = deviceId.replace(/,|\r|\n/g, '_');
+    const line = `${serverTime},${safeEmpId},${safeNameNoComma},${ip},${saveName},${office},${safeDeviceId},${imageHash || ''}\n`;
+    try { 
+      fs.appendFileSync(logFile, line, { encoding: 'utf8' }); 
+    } catch (logErr) {
+      console.error('[register] CSV log write error:', logErr.message);
+    }
 
-  return res.json({ ok: true, ip, office, file: saveName, serverTime, message: '인증(등록) 완료' });
+    return res.json({ ok: true, ip, office, file: saveName, serverTime, message: '인증(등록) 완료' });
+  } catch (saveErr) {
+    console.error('[register] File save error:', saveErr.message);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'SAVE_ERROR', 
+      message: '파일 저장 중 오류가 발생했습니다. 다시 시도해주세요.',
+      ip, 
+      office, 
+      serverTime 
+    });
+  }
+});
+
+// Multer 에러 처리 미들웨어
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'FILE_TOO_LARGE', 
+        message: '파일 크기가 너무 큽니다. (최대 5MB)',
+        ip: getClientIp(req),
+        office: false,
+        serverTime: getKoreaTime()
+      });
+    }
+    return res.status(400).json({ 
+      ok: false, 
+      error: 'UPLOAD_ERROR', 
+      message: '파일 업로드 중 오류가 발생했습니다.',
+      ip: getClientIp(req),
+      office: false,
+      serverTime: getKoreaTime()
+    });
+  }
+  if (err) {
+    return res.status(400).json({ 
+      ok: false, 
+      error: 'VALIDATION_ERROR', 
+      message: err.message || '파일 검증 실패',
+      ip: getClientIp(req),
+      office: false,
+      serverTime: getKoreaTime()
+    });
+  }
+  next();
 });
 
 // ==================== 관리자 기능 ====================
@@ -350,15 +539,18 @@ app.get('/admin/records', requireAdmin, (req, res) => {
     if (!fs.existsSync(logFile)) {
       return res.json({ ok: true, records: [] });
     }
+
     const content = fs.readFileSync(logFile, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-    const headers = lines[0].split(',');
+    const lines = content.split('\n');
     const records = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',');
+      const rawLine = lines[i];
+      if (!rawLine || !rawLine.trim()) continue;
+      const cols = rawLine.split(',');
       if (cols.length >= 8) {
         const record = {
+          recordId: i,
           server_time: cols[0],
           employee_id: cols[1],
           name: cols[2],
@@ -368,22 +560,119 @@ app.get('/admin/records', requireAdmin, (req, res) => {
           device_id: cols[6],
           image_hash: cols[7]
         };
-        
-        // 사번 필터링
+
         const empId = req.query.employeeId;
         if (!empId || record.employee_id === empId) {
           records.push(record);
         }
       }
     }
-    
-    // 최신순 정렬
+
     records.reverse();
-    
+
     return res.json({ ok: true, records });
   } catch (err) {
     console.error('기록 조회 오류:', err);
     return res.status(500).json({ ok: false, message: '기록 조회 실패' });
+  }
+});
+
+app.post('/admin/delete-records', requireAdmin, (req, res) => {
+  const { recordIds, deleteAll } = req.body || {};
+
+  try {
+    if (!fs.existsSync(logFile)) {
+      return res.status(404).json({ ok: false, message: '등록 기록이 없습니다.' });
+    }
+
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n');
+
+    if (deleteAll) {
+      let deletedCount = 0;
+      const filesToDelete = new Set();
+
+      for (let i = 1; i < lines.length; i++) {
+        const rawLine = lines[i];
+        if (!rawLine || !rawLine.trim()) continue;
+        deletedCount++;
+        const cols = rawLine.split(',');
+        const fileName = (cols[4] || '').trim();
+        if (fileName && fileName !== '-') {
+          filesToDelete.add(fileName);
+        }
+      }
+
+      fs.writeFileSync(logFile, `${lines[0] || 'server_time,employee_id,name,ip,file,office,device_id,image_hash'}\n`, { encoding: 'utf8' });
+
+      filesToDelete.forEach(file => {
+        const filePath = path.join(uploadDir, file);
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+            if (DEBUG) console.log(`[delete-records] 파일 삭제: ${file}`);
+          } catch (fileErr) {
+            console.error(`[delete-records] 파일 삭제 오류 (${file}):`, fileErr.message);
+          }
+        }
+      });
+
+      return res.json({ ok: true, deleted: deletedCount, deletedFiles: filesToDelete.size });
+    }
+
+    if (!Array.isArray(recordIds) || recordIds.length === 0) {
+      return res.status(400).json({ ok: false, message: '삭제할 기록을 선택해주세요.' });
+    }
+
+    const numericIds = [...new Set(recordIds.map(Number))].filter(n => Number.isInteger(n) && n > 0);
+    if (numericIds.length === 0) {
+      return res.status(400).json({ ok: false, message: '유효한 기록 번호가 없습니다.' });
+    }
+
+    const targets = new Set(numericIds);
+    const filesToDelete = new Set();
+    const newLines = [lines[0] || 'server_time,employee_id,name,ip,file,office,device_id,image_hash'];
+    let deletedCount = 0;
+
+    for (let i = 1; i < lines.length; i++) {
+      const rawLine = lines[i];
+      if (!rawLine) continue;
+
+      if (targets.has(i) && rawLine.trim()) {
+        deletedCount++;
+        const cols = rawLine.split(',');
+        const fileName = (cols[4] || '').trim();
+        if (fileName && fileName !== '-') {
+          filesToDelete.add(fileName);
+        }
+        continue;
+      }
+
+      newLines.push(rawLine);
+    }
+
+    if (deletedCount === 0) {
+      return res.status(404).json({ ok: false, message: '선택한 기록을 찾을 수 없습니다.' });
+    }
+
+    fs.writeFileSync(logFile, newLines.join('\n'), { encoding: 'utf8' });
+
+    filesToDelete.forEach(file => {
+      const filePath = path.join(uploadDir, file);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          if (DEBUG) console.log(`[delete-records] 파일 삭제: ${file}`);
+        } catch (fileErr) {
+          console.error(`[delete-records] 파일 삭제 오류 (${file}):`, fileErr.message);
+        }
+      }
+    });
+
+    return res.json({ ok: true, deleted: deletedCount, deletedFiles: filesToDelete.size });
+  } catch (err) {
+    console.error('등록 기록 삭제 오류:', err);
+    return res.status(500).json({ ok: false, message: '삭제 처리 중 오류가 발생했습니다.' });
   }
 });
 
@@ -605,11 +894,102 @@ app.post('/admin/reject-device-request', requireAdmin, (req, res) => {
   }
 });
 
+// 업로드된 이미지 파일 제공
+app.get('/uploads/:filename', (req, res) => {
+  const filename = req.params.filename;
+  
+  // 보안: 파일명에 경로 조작 방지
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ ok: false, message: '잘못된 파일명입니다.' });
+  }
+  
+  const filePath = path.join(uploadDir, filename);
+  
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ ok: false, message: '파일을 찾을 수 없습니다.' });
+  }
+  
+  res.sendFile(filePath);
+});
+
+// 이미지 삭제 API (관리자 전용)
+app.post('/admin/delete-photo', requireAdmin, (req, res) => {
+  const { filename } = req.body;
+  
+  if (!filename) {
+    return res.status(400).json({ ok: false, message: '파일명이 필요합니다.' });
+  }
+  
+  // 보안: 파일명에 경로 조작 방지
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ ok: false, message: '잘못된 파일명입니다.' });
+  }
+  
+  const filePath = path.join(uploadDir, filename);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ ok: false, message: '파일을 찾을 수 없습니다.' });
+    }
+    
+    // 파일 삭제
+    fs.unlinkSync(filePath);
+    
+    if (DEBUG) console.log(`[delete-photo] Deleted file: ${filename}`);
+    
+    return res.json({ ok: true, message: '파일이 삭제되었습니다.' });
+  } catch (err) {
+    console.error('[delete-photo] Error:', err.message);
+    return res.status(500).json({ ok: false, message: '파일 삭제 실패' });
+  }
+});
+
+// 오래된 업로드 파일 정리 함수 (30일 이상 된 파일 삭제)
+function cleanupOldFiles() {
+  try {
+    if (!fs.existsSync(uploadDir)) return;
+    
+    const files = fs.readdirSync(uploadDir);
+    const now = Date.now();
+    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30일 (밀리초)
+    let deletedCount = 0;
+    
+    for (const file of files) {
+      const filePath = path.join(uploadDir, file);
+      try {
+        const stats = fs.statSync(filePath);
+        const age = now - stats.mtimeMs;
+        
+        if (age > maxAge) {
+          fs.unlinkSync(filePath);
+          deletedCount++;
+          if (DEBUG) console.log(`[cleanup] Deleted old file: ${file}`);
+        }
+      } catch (fileErr) {
+        if (DEBUG) console.error(`[cleanup] Error processing file ${file}:`, fileErr.message);
+      }
+    }
+    
+    if (deletedCount > 0) {
+      console.log(`[cleanup] ${deletedCount}개의 오래된 파일이 삭제되었습니다.`);
+    }
+  } catch (err) {
+    console.error('[cleanup] Error:', err.message);
+  }
+}
+
+// 서버 시작 시 정리 실행, 이후 매일 자정에 실행
+cleanupOldFiles();
+setInterval(cleanupOldFiles, 24 * 60 * 60 * 1000); // 24시간마다 실행
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`server on :${PORT}`);
   console.log(`관리자 페이지: http://localhost:${PORT}/admin.html`);
   console.log(`관리자 비밀번호: ${ADMIN_PASSWORD} (환경변수 ADMIN_PASSWORD로 변경 가능)`);
+  if (DEBUG) {
+    console.log('디버깅 모드: 활성화됨');
+  }
 });
 
 

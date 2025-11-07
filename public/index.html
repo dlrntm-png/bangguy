@@ -48,13 +48,65 @@
       }
     }
 
+    // 사진 미리보기 함수
+    function showPhotoPreview(file) {
+      const previewDiv = document.getElementById('photoPreview');
+      const previewImg = document.getElementById('previewImg');
+      
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          previewImg.src = e.target.result;
+          previewDiv.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        previewDiv.style.display = 'none';
+      }
+    }
+
+    // 사진 제거 함수
+    function clearPhoto() {
+      document.getElementById('photo').value = '';
+      document.getElementById('photoPreview').style.display = 'none';
+    }
+
+    // 입력 필드 초기화 함수
+    function resetForm() {
+      document.getElementById('empId').value = '';
+      document.getElementById('empName').value = '';
+      document.getElementById('photo').value = '';
+      document.getElementById('photoPreview').style.display = 'none';
+    }
+
     async function submitForm() {
       const empId = document.getElementById('empId').value.trim();
       const empName = document.getElementById('empName').value.trim();
       const file = document.getElementById('photo').files?.[0];
       const resBox = document.getElementById('result');
-      if (!empId || !empName) { resBox.textContent = '사번/이름을 입력해주세요.'; return; }
-      if (!file) { resBox.textContent = '사진을 선택/촬영해주세요.'; return; }
+      const submitBtn = document.getElementById('submitBtn');
+      
+      if (!empId || !empName) { 
+        resBox.textContent = '사번/이름을 입력해주세요.'; 
+        return; 
+      }
+      if (!file) { 
+        resBox.textContent = '사진을 선택/촬영해주세요.'; 
+        return; 
+      }
+
+      // 파일 크기 검증 (클라이언트 측)
+      if (file.size > 5 * 1024 * 1024) {
+        resBox.textContent = '파일 크기가 너무 큽니다. (최대 5MB)';
+        return;
+      }
+
+      // 파일 타입 검증
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        resBox.textContent = '이미지 파일만 업로드 가능합니다. (JPEG, PNG, GIF, WebP)';
+        return;
+      }
 
       const form = new FormData();
       form.append('employeeId', empId);
@@ -63,6 +115,8 @@
       form.append('deviceId', getDeviceId()); // 기기 ID 추가
 
       resBox.textContent = '전송 중...';
+      submitBtn.disabled = true;
+
       try {
         const r = await fetch('/attend/register', { method: 'POST', body: form });
         const d = await r.json();
@@ -87,6 +141,11 @@
         if (d.ok) {
           resBox.innerHTML = `✅ ${d.message || '등록 완료'}<br>${ip} / ${office}<br>${stamp}`;
           document.getElementById('deviceRequestSection').classList.add('hidden');
+          // 등록 성공 시 입력 필드 초기화
+          setTimeout(() => {
+            resetForm();
+            resBox.textContent = '';
+          }, 3000); // 3초 후 초기화
         } else {
           const reason = d.message || d.error || '등록 실패';
           resBox.innerHTML = `⚠️ ${reason}<br>${ip} / ${office}<br>${stamp}`;
@@ -102,6 +161,9 @@
         }
       } catch (e) {
         resBox.textContent = '오류가 발생했습니다. 네트워크 상태를 확인해주세요.';
+        console.error('등록 오류:', e);
+      } finally {
+        submitBtn.disabled = false;
       }
     }
 
@@ -149,6 +211,16 @@
       loadIpStatus();
       document.getElementById('submitBtn').addEventListener('click', submitForm);
       document.getElementById('requestDeviceBtn').addEventListener('click', requestDeviceUpdate);
+      
+      // 사진 선택 시 미리보기 표시
+      document.getElementById('photo').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          showPhotoPreview(file);
+        } else {
+          clearPhoto();
+        }
+      });
     });
   </script>
 </head>
@@ -172,6 +244,12 @@
   <div class="row">
     <label>사진(셀피)</label><br />
     <input id="photo" type="file" accept="image/*" capture="user" />
+    <div id="photoPreview" style="margin-top: 8px; display: none;">
+      <img id="previewImg" src="" alt="미리보기" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;" />
+      <div style="margin-top: 4px;">
+        <button type="button" onclick="clearPhoto()" style="padding: 4px 8px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">사진 제거</button>
+      </div>
+    </div>
   </div>
 
   <button id="submitBtn">인증(등록)</button>
