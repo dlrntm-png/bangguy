@@ -1,8 +1,8 @@
-import { getKoreaISOString } from '../../../lib/time.js';
+import { getKoreaISOString } from '../../../lib/time';
 import {
   findPendingDeviceRequest,
   insertDeviceRequest
-} from '../../../lib/db.js';
+} from '../../../lib/db';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

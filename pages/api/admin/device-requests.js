@@ -1,5 +1,5 @@
-import { verifyAdminToken } from '../../../lib/adminAuth.js';
-import { getDeviceRequests } from '../../../lib/db.js';
+import { verifyAdminToken } from '../../../lib/adminAuth';
+import { getDeviceRequests } from '../../../lib/db';
 
 export default async function handler(req, res) {
   try {

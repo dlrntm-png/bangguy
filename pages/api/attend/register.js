@@ -1,14 +1,14 @@
 import formidable from 'formidable';
 import fs from 'fs/promises';
-import { getClientIp, isOfficeIp } from '../../../lib/ip.js';
-import { getKoreaISOString } from '../../../lib/time.js';
-import { md5 } from '../../../lib/hash.js';
+import { getClientIp, isOfficeIp } from '../../../lib/ip';
+import { getKoreaISOString } from '../../../lib/time';
+import { md5 } from '../../../lib/hash';
 import {
   getLastRecordByEmployee,
   findRecordByHash,
   insertAttendanceRecord
-} from '../../../lib/db.js';
-import { uploadPhotoBuffer } from '../../../lib/blob.js';
+} from '../../../lib/db';
+import { uploadPhotoBuffer } from '../../../lib/blob';
 
 export const config = {
   api: {

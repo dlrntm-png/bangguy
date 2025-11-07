@@ -1,9 +1,9 @@
-import { verifyAdminToken } from '../../../lib/adminAuth.js';
+import { verifyAdminToken } from '../../../lib/adminAuth';
 import {
   getDeviceRequestById,
   completeDeviceRequest,
   updateDeviceId
-} from '../../../lib/db.js';
+} from '../../../lib/db';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

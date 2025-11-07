@@ -1,6 +1,6 @@
-import { verifyAdminToken } from '../../../lib/adminAuth.js';
-import { getRecordById, clearPhotoFields } from '../../../lib/db.js';
-import { deleteBlob } from '../../../lib/blob.js';
+import { verifyAdminToken } from '../../../lib/adminAuth';
+import { getRecordById, clearPhotoFields } from '../../../lib/db';
+import { deleteBlob } from '../../../lib/blob';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

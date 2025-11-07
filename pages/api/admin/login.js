@@ -1,4 +1,4 @@
-import { issueAdminToken } from '../../../lib/adminAuth.js';
+import { issueAdminToken } from '../../../lib/adminAuth';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

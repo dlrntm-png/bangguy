@@ -1,4 +1,4 @@
-import { getClientIp, isOfficeIp } from '../../../lib/ip.js';
+import { getClientIp, isOfficeIp } from '../../lib/ip';
 
 export default function handler(req, res) {
   const ip = getClientIp(req);

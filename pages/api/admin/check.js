@@ -1,4 +1,4 @@
-import { verifyAdminToken } from '../../../lib/adminAuth.js';
+import { verifyAdminToken } from '../../../lib/adminAuth';
 
 export default function handler(req, res) {
   try {

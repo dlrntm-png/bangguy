@@ -1,9 +1,9 @@
-import { verifyAdminToken } from '../../../lib/adminAuth.js';
+import { verifyAdminToken } from '../../../lib/adminAuth';
 import {
   deleteRecordsByIds,
   deleteAllRecords
-} from '../../../lib/db.js';
-import { deleteBlob } from '../../../lib/blob.js';
+} from '../../../lib/db';
+import { deleteBlob } from '../../../lib/blob';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

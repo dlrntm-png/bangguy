@@ -1,5 +1,5 @@
-import { verifyAdminToken } from '../../../lib/adminAuth.js';
-import { getAllRecordsRaw } from '../../../lib/db.js';
+import { verifyAdminToken } from '../../../lib/adminAuth';
+import { getAllRecordsRaw } from '../../../lib/db';
 
 export default async function handler(req, res) {
   try {
