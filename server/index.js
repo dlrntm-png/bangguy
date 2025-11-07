@@ -102,28 +102,36 @@ function isOfficeIp(clientIp) {
       
       // CIDR 매칭
       const [range, prefix] = entry.split('/');
-      const net = ipaddr.parse(range);
       const prefixLen = parseInt(prefix, 10);
       console.log('[isOfficeIp] CIDR check - range:', range, 'prefix:', prefixLen);
-      console.log('[isOfficeIp] Network kind:', net.kind(), 'Address kind:', addr.kind());
+      console.log('[isOfficeIp] Address kind:', addr.kind());
       
-      if (addr.kind() === net.kind()) {
-        const matchResult = addr.match([net.toByteArray(), prefixLen]);
-        console.log('[isOfficeIp] CIDR match result (same kind):', matchResult);
-        if (matchResult) {
-          console.log('[isOfficeIp] ✅ MATCH (CIDR match)');
-          return true;
+      try {
+        // parseCIDR을 사용하여 CIDR 범위 파싱
+        const subnet = ipaddr.parseCIDR(entry);
+        console.log('[isOfficeIp] Parsed CIDR subnet:', subnet);
+        
+        if (addr.kind() === subnet[0].kind()) {
+          const matchResult = addr.match(subnet);
+          console.log('[isOfficeIp] CIDR match result (same kind):', matchResult);
+          if (matchResult) {
+            console.log('[isOfficeIp] ✅ MATCH (CIDR match)');
+            return true;
+          }
         }
-      }
-      
-      if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress() && net.kind() === 'ipv4') {
-        const v4 = addr.toIPv4Address();
-        const matchResult = v4.match([net.toByteArray(), prefixLen]);
-        console.log('[isOfficeIp] CIDR match result (IPv6 mapped to IPv4):', matchResult);
-        if (matchResult) {
-          console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4, CIDR match)');
-          return true;
+        
+        if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress() && subnet[0].kind() === 'ipv4') {
+          const v4 = addr.toIPv4Address();
+          const v4Subnet = ipaddr.parseCIDR(range + '/' + prefix);
+          const matchResult = v4.match(v4Subnet);
+          console.log('[isOfficeIp] CIDR match result (IPv6 mapped to IPv4):', matchResult);
+          if (matchResult) {
+            console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4, CIDR match)');
+            return true;
+          }
         }
+      } catch (cidrErr) {
+        console.log('[isOfficeIp] CIDR parse error for entry:', entry, 'error:', cidrErr.message);
       }
       console.log('[isOfficeIp] ❌ No match for CIDR entry:', entry);
     }
