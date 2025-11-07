@@ -45,6 +45,11 @@
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 프로젝트에서 발급한 Read/Write 토큰 |
 | `POSTGRES_URL` | Supabase Postgres 연결 문자열 (`postgres://...`) |
 | `POSTGRES_SSL` | (선택) `disable` 또는 `require` 등 SSL 모드 지정, 기본값 `require` |
+| `SUPABASE_DB_PASSWORD` | (대안) Supabase DB 비밀번호. `POSTGRES_URL` 대신 자동으로 연결 문자열을 구성할 때 사용 |
+| `SUPABASE_PROJECT_ID` | (대안) Supabase 프로젝트 ID (예: `iwtkumlqavwcmfsxjdvp`). `SUPABASE_DB_PASSWORD`와 함께 사용 |
+| `SUPABASE_DB_USER` | (선택) DB 사용자명, 기본값 `postgres` |
+| `SUPABASE_DB_NAME` | (선택) DB 이름, 기본값 `postgres` |
+| `SUPABASE_DB_PORT` | (선택) DB 포트, 기본값 `5432` |
 
 > **로컬 개발 시** `.env.local` 에 Supabase Connection string을 그대로 넣으면 동일하게 동작합니다.
 
@@ -67,6 +72,7 @@ npm run dev
    - `ADMIN_JWT_SECRET`
    - `BLOB_READ_WRITE_TOKEN` (Vercel Blob 대시보드에서 발급)
    - `POSTGRES_URL` (Supabase Dashboard → Project Settings → Database → Connection string → `URI` 항목)
+     - 또는 `SUPABASE_PROJECT_ID` + `SUPABASE_DB_PASSWORD` 조합으로 자동 구성 가능
    - (선택) `POSTGRES_SSL` (`require`/`prefer`/`disable` 등 Supabase 정책에 맞게 지정)
 3. **Blob & DB 연결**
    - Vercel Dashboard → Storage → Blob 에서 Read/Write Token 발급 → 환경 변수 저장
@@ -116,6 +122,7 @@ npm run dev
 2. `Project Settings → Database → Connection string`에서 `URI` 값을 복사합니다.
 3. Vercel 프로젝트의 `Settings → Environment Variables`에 `POSTGRES_URL` (필수), `POSTGRES_SSL`(선택) 값을 입력하고 저장합니다.
 4. 재배포 후 `/api/attend/register` 호출 시 Supabase에 출퇴근 기록이 저장됩니다.
+   - `POSTGRES_URL`을 직접 넣지 않고 `SUPABASE_PROJECT_ID` + `SUPABASE_DB_PASSWORD`를 사용하면 코드가 자동으로 `postgres://` URI를 생성합니다.
 
 ## 마이그레이션 참고 (이전 Express 버전 → Vercel 버전)
 - 로컬 디스크에 저장하던 업로드 파일 → Vercel Blob
