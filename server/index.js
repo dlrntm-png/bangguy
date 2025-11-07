@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import * as ipaddr from 'ipaddr.js';
+import ipaddr from 'ipaddr.js';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
