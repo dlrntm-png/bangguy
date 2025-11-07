@@ -4,6 +4,7 @@ import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import * as ipaddr from 'ipaddr.js';
 import { fileURLToPath } from 'url';
@@ -35,7 +36,7 @@ const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 const logFile = path.join(logsDir, 'attendance.csv');
 if (!fs.existsSync(logFile)) {
-  fs.writeFileSync(logFile, 'server_time,employee_id,name,ip,file,office\n', { encoding: 'utf8' });
+  fs.writeFileSync(logFile, 'server_time,employee_id,name,ip,file,office,device_id,image_hash\n', { encoding: 'utf8' });
 }
 
 // 화이트리스트 IP/CIDR 로드
@@ -85,6 +86,62 @@ function getKoreaTime() {
   return koreaTime.toISOString();
 }
 
+// 이미지 해시 계산 함수
+function getImageHash(filePath) {
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    return crypto.createHash('md5').update(fileBuffer).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+// CSV에서 해시 중복 확인 함수
+function isDuplicateHash(imageHash) {
+  try {
+    if (!imageHash || !fs.existsSync(logFile)) return false;
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n');
+    // 헤더 제외하고 각 줄에서 해시 확인
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 8 && cols[7] && cols[7].trim() === imageHash) {
+        return true; // 중복 발견
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// 기기 ID 바인딩 확인 함수
+function checkDeviceBinding(employeeId, deviceId) {
+  try {
+    if (!fs.existsSync(logFile)) return { allowed: true, message: null };
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n');
+    
+    // 최근 등록 기록에서 같은 사번의 기기 ID 확인 (역순으로 검색)
+    for (let i = lines.length - 1; i >= 1; i--) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 7 && cols[1] === employeeId) {
+        const lastDeviceId = (cols[6] || '').trim();
+        if (lastDeviceId && lastDeviceId !== deviceId) {
+          return { 
+            allowed: false, 
+            message: '다른 기기에서 등록된 기록이 있습니다. 본인 기기에서 등록해주세요.' 
+          };
+        }
+        break; // 첫 번째 매칭만 확인
+      }
+    }
+    return { allowed: true, message: null };
+  } catch {
+    return { allowed: true, message: null };
+  }
+}
+
 // 현재 접속 IP/사내망 여부 제공(처음부터 차단하지 않음)
 app.get('/ip-status', (req, res) => {
   const ip = getClientIp(req);
@@ -97,6 +154,7 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
   const ip = getClientIp(req);
   const office = isOfficeIp(ip);
   const serverTime = getKoreaTime();
+  const deviceId = String(req.body.deviceId || '').trim();
 
   const employeeId = String(req.body.employeeId || '').trim();
   const name = String(req.body.name || '').trim();
@@ -107,6 +165,10 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
   }
   if (!req.file) {
     return res.status(400).json({ ok: false, error: 'PHOTO_REQUIRED', ip, office, serverTime });
+  }
+  if (!deviceId) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ ok: false, error: 'DEVICE_ID_REQUIRED', ip, office, serverTime });
   }
 
   if (!office) {
@@ -122,6 +184,34 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
     });
   }
 
+  // 1. 사진 중복 감지
+  const imageHash = getImageHash(req.file.path);
+  if (imageHash && isDuplicateHash(imageHash)) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(200).json({
+      ok: false,
+      reason: 'DUPLICATE_PHOTO',
+      message: '이미 사용된 사진입니다. 새로운 사진을 촬영해주세요.',
+      ip,
+      office,
+      serverTime
+    });
+  }
+
+  // 2. 기기 ID 바인딩 확인
+  const deviceCheck = checkDeviceBinding(employeeId, deviceId);
+  if (!deviceCheck.allowed) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(200).json({
+      ok: false,
+      reason: 'DEVICE_MISMATCH',
+      message: deviceCheck.message,
+      ip,
+      office,
+      serverTime
+    });
+  }
+
   // 파일 확장자/이름 정리 후 저장 (데모: 로컬 저장)
   const original = req.file.originalname || 'photo.jpg';
   const ext = path.extname(original) || '.jpg';
@@ -131,9 +221,10 @@ app.post('/attend/register', upload.single('photo'), async (req, res) => {
   fs.renameSync(req.file.path, savePath);
 
   // TODO: DB 저장 { employeeId, name, photo_path: saveName, ip, created_at }
-  // CSV 로그 저장
+  // CSV 로그 저장 (device_id, image_hash 추가)
   const safeNameNoComma = name.replace(/,|\r|\n/g, ' ');
-  const line = `${serverTime},${safeEmpId},${safeNameNoComma},${ip},${saveName},${office}\n`;
+  const safeDeviceId = deviceId.replace(/,|\r|\n/g, '_');
+  const line = `${serverTime},${safeEmpId},${safeNameNoComma},${ip},${saveName},${office},${safeDeviceId},${imageHash || ''}\n`;
   try { fs.appendFileSync(logFile, line, { encoding: 'utf8' }); } catch {}
 
   return res.json({ ok: true, ip, office, file: saveName, serverTime, message: '인증(등록) 완료' });

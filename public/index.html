@@ -13,6 +13,17 @@
     .err { background:#fecaca; }
   </style>
   <script>
+    // 기기 고유 ID 생성/조회 함수
+    function getDeviceId() {
+      let deviceId = localStorage.getItem('attendance_device_id');
+      if (!deviceId) {
+        // 고유 ID 생성 (랜덤 문자열 + 타임스탬프)
+        deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('attendance_device_id', deviceId);
+      }
+      return deviceId;
+    }
+
     async function loadIpStatus() {
       const curIp = document.getElementById('curIp');
       const curOffice = document.getElementById('curOffice');
@@ -45,6 +56,7 @@
       form.append('employeeId', empId);
       form.append('name', empName);
       form.append('photo', file);
+      form.append('deviceId', getDeviceId()); // 기기 ID 추가
 
       resBox.textContent = '전송 중...';
       try {
