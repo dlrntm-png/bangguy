@@ -46,8 +46,15 @@ const OFFICE_IPS = (process.env.OFFICE_IPS || '')
   .filter(Boolean);
 
 function getClientIp(req) {
-  const ip = req.ip || req.socket?.remoteAddress || '';
-  return ip.replace('::ffff:', '');
+  let ip = req.ip || req.socket?.remoteAddress || '';
+  ip = ip.replace('::ffff:', '');
+  
+  // IPv6 localhost를 IPv4로 변환 (표시용)
+  if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+    ip = '127.0.0.1';
+  }
+  
+  return ip;
 }
 
 function isOfficeIp(clientIp) {
