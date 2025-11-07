@@ -45,6 +45,12 @@ const OFFICE_IPS = (process.env.OFFICE_IPS || '')
   .map(s => s.trim())
   .filter(Boolean);
 
+// 디버깅: 환경변수 및 로드된 IP 확인
+console.log('=== IP 화이트리스트 디버깅 ===');
+console.log('OFFICE_IPS from .env:', process.env.OFFICE_IPS);
+console.log('Loaded OFFICE_IPS array:', OFFICE_IPS);
+console.log('OFFICE_IPS count:', OFFICE_IPS.length);
+
 function getClientIp(req) {
   let ip = req.ip || req.socket?.remoteAddress || '';
   ip = ip.replace('::ffff:', '');
@@ -58,30 +64,76 @@ function getClientIp(req) {
 }
 
 function isOfficeIp(clientIp) {
-  if (!clientIp) return false;
+  if (!clientIp) {
+    console.log('[isOfficeIp] clientIp is empty');
+    return false;
+  }
+  
+  console.log('[isOfficeIp] Checking IP:', clientIp);
+  console.log('[isOfficeIp] Against whitelist:', OFFICE_IPS);
+  
   try {
     const addr = ipaddr.parse(clientIp);
+    console.log('[isOfficeIp] Parsed address kind:', addr.kind());
+    console.log('[isOfficeIp] Parsed address:', addr.toString());
+    
     for (const entry of OFFICE_IPS) {
+      console.log('[isOfficeIp] Checking entry:', entry);
+      
       if (!entry.includes('/')) {
+        // 단일 IP 매칭
         const target = ipaddr.parse(entry);
+        console.log('[isOfficeIp] Single IP comparison - client:', addr.toString(), 'target:', target.toString());
+        
         if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress()) {
-          if (addr.toIPv4Address().toString() === target.toString()) return true;
+          const v4 = addr.toIPv4Address();
+          if (v4.toString() === target.toString()) {
+            console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4)');
+            return true;
+          }
         }
-        if (addr.kind() === target.kind() && addr.toNormalizedString() === target.toNormalizedString()) return true;
+        if (addr.kind() === target.kind() && addr.toNormalizedString() === target.toNormalizedString()) {
+          console.log('[isOfficeIp] ✅ MATCH (exact match)');
+          return true;
+        }
+        console.log('[isOfficeIp] ❌ No match for single IP entry:', entry);
         continue;
       }
+      
+      // CIDR 매칭
       const [range, prefix] = entry.split('/');
       const net = ipaddr.parse(range);
       const prefixLen = parseInt(prefix, 10);
-      if (addr.kind() === net.kind() && addr.match([net.toByteArray(), prefixLen])) return true;
+      console.log('[isOfficeIp] CIDR check - range:', range, 'prefix:', prefixLen);
+      console.log('[isOfficeIp] Network kind:', net.kind(), 'Address kind:', addr.kind());
+      
+      if (addr.kind() === net.kind()) {
+        const matchResult = addr.match([net.toByteArray(), prefixLen]);
+        console.log('[isOfficeIp] CIDR match result (same kind):', matchResult);
+        if (matchResult) {
+          console.log('[isOfficeIp] ✅ MATCH (CIDR match)');
+          return true;
+        }
+      }
+      
       if (addr.kind() === 'ipv6' && addr.isIPv4MappedAddress() && net.kind() === 'ipv4') {
         const v4 = addr.toIPv4Address();
-        if (v4.match([net.toByteArray(), prefixLen])) return true;
+        const matchResult = v4.match([net.toByteArray(), prefixLen]);
+        console.log('[isOfficeIp] CIDR match result (IPv6 mapped to IPv4):', matchResult);
+        if (matchResult) {
+          console.log('[isOfficeIp] ✅ MATCH (IPv6 mapped to IPv4, CIDR match)');
+          return true;
+        }
       }
+      console.log('[isOfficeIp] ❌ No match for CIDR entry:', entry);
     }
-  } catch {
+  } catch (err) {
+    console.error('[isOfficeIp] ❌ ERROR:', err.message);
+    console.error('[isOfficeIp] Error stack:', err.stack);
     return false;
   }
+  
+  console.log('[isOfficeIp] ❌ No match found for IP:', clientIp);
   return false;
 }
 
@@ -152,7 +204,9 @@ function checkDeviceBinding(employeeId, deviceId) {
 // 현재 접속 IP/사내망 여부 제공(처음부터 차단하지 않음)
 app.get('/ip-status', (req, res) => {
   const ip = getClientIp(req);
+  console.log('[GET /ip-status] Request from IP:', ip);
   const office = isOfficeIp(ip);
+  console.log('[GET /ip-status] Result - IP:', ip, 'Office:', office);
   res.json({ ip, office });
 });
 
