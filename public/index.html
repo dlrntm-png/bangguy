@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>출퇴근 등록</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+    .row { margin: 8px 0; }
+    .badge { display:inline-block; padding:2px 6px; border-radius:4px; background:#eee; margin-left:6px; }
+    .ok { background:#d1fae5; }
+    .warn { background:#fde68a; }
+    .err { background:#fecaca; }
+  </style>
+  <script>
+    async function loadIpStatus() {
+      const curIp = document.getElementById('curIp');
+      const curOffice = document.getElementById('curOffice');
+      try {
+        const r = await fetch('/ip-status', { cache: 'no-store' });
+        const d = await r.json();
+        curIp.textContent = d.ip || '-';
+        if (d.office) {
+          curOffice.textContent = '사내망';
+          curOffice.className = 'badge ok';
+        } else {
+          curOffice.textContent = '사내망 아님';
+          curOffice.className = 'badge warn';
+        }
+      } catch {
+        curIp.textContent = '조회 실패';
+        curOffice.textContent = '-';
+      }
+    }
+
+    async function submitForm() {
+      const empId = document.getElementById('empId').value.trim();
+      const empName = document.getElementById('empName').value.trim();
+      const file = document.getElementById('photo').files?.[0];
+      const resBox = document.getElementById('result');
+      if (!empId || !empName) { resBox.textContent = '사번/이름을 입력해주세요.'; return; }
+      if (!file) { resBox.textContent = '사진을 선택/촬영해주세요.'; return; }
+
+      const form = new FormData();
+      form.append('employeeId', empId);
+      form.append('name', empName);
+      form.append('photo', file);
+
+      resBox.textContent = '전송 중...';
+      try {
+        const r = await fetch('/attend/register', { method: 'POST', body: form });
+        const d = await r.json();
+        const ip = d.ip ? `IP: ${d.ip}` : 'IP: -';
+        const office = d.office ? '사내망' : '사내망 아님';
+        const stamp = d.serverTime ? `시간: ${d.serverTime}` : '';
+        if (d.ok) {
+          resBox.innerHTML = `✅ ${d.message || '등록 완료'}<br>${ip} / ${office}<br>${stamp}`;
+        } else {
+          const reason = d.message || d.error || '등록 실패';
+          resBox.innerHTML = `⚠️ ${reason}<br>${ip} / ${office}<br>${stamp}`;
+        }
+      } catch (e) {
+        resBox.textContent = '오류가 발생했습니다. 네트워크 상태를 확인해주세요.';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadIpStatus();
+      document.getElementById('submitBtn').addEventListener('click', submitForm);
+    });
+  </script>
+</head>
+<body>
+  <h2>출퇴근 등록</h2>
+
+  <div class="row">현재 접속 공인 IP: <span id="curIp">조회 중...</span>
+    <span id="curOffice" class="badge">-</span>
+  </div>
+
+  <div class="row">
+    <label>사번</label><br />
+    <input id="empId" type="text" placeholder="사번" />
+  </div>
+
+  <div class="row">
+    <label>이름</label><br />
+    <input id="empName" type="text" placeholder="이름" />
+  </div>
+
+  <div class="row">
+    <label>사진(셀피)</label><br />
+    <input id="photo" type="file" accept="image/*" capture="user" />
+  </div>
+
+  <button id="submitBtn">인증(등록)</button>
+  <div class="row" id="result" style="margin-top:12px;"></div>
+</body>
+</html>
+
+
