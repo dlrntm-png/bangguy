@@ -31,6 +31,44 @@ npm run start
 - `GET /ip-status`: 현재 요청의 공인 IP 및 사내망 여부 반환 `{ ip, office }`
 - `POST /attend/register`: 사번/이름/사진 등록. 응답에 `{ ok, ip, office, message }` 포함
 
+## 버전 관리 (Git)
+
+이 프로젝트는 Git으로 버전 관리됩니다.
+
+### 초기 설정
+```bash
+# Git 사용자 정보 설정 (처음 한 번만)
+git config user.name "Your Name"
+git config user.email "your.email@example.com"
+```
+
+### 기본 명령어
+```bash
+# 변경사항 확인
+git status
+
+# 변경사항 추가
+git add .
+
+# 커밋
+git commit -m "feat: 기능 설명"
+
+# 커밋 히스토리 확인
+git log
+
+# 원격 저장소 연결 (GitHub 등)
+git remote add origin <repository-url>
+git push -u origin master
+```
+
+### 제외된 파일
+- `node_modules/` - npm 패키지
+- `.env` - 환경 변수 (민감 정보)
+- `server/logs/` - 로그 파일
+- `server/uploads/` - 업로드된 사진
+
+자세한 규칙은 `PROJECT_RULES.md` 참고
+
 ## 운영 팁
 - 처음부터 URL 접근은 차단하지 않되, 등록 시 서버가 본 IP/사내망 여부를 응답에 포함하여 화면에 표시
 - 프록시/로드밸런서 뒤라면 `trust proxy`를 정확히 설정해야 `req.ip`가 올바른 공인 IP를 반영
