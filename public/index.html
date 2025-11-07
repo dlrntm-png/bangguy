@@ -11,6 +11,10 @@
     .ok { background:#d1fae5; }
     .warn { background:#fde68a; }
     .err { background:#fecaca; }
+    .hidden { display: none; }
+    button.primary { padding: 8px 16px; background: #007bff; color: white; border: 1px solid #007bff; border-radius: 4px; cursor: pointer; }
+    button.primary:hover { background: #0056b3; }
+    button.primary:disabled { background: #ccc; cursor: not-allowed; }
   </style>
   <script>
     // 기기 고유 ID 생성/조회 함수
@@ -82,18 +86,69 @@
         }
         if (d.ok) {
           resBox.innerHTML = `✅ ${d.message || '등록 완료'}<br>${ip} / ${office}<br>${stamp}`;
+          document.getElementById('deviceRequestSection').classList.add('hidden');
         } else {
           const reason = d.message || d.error || '등록 실패';
           resBox.innerHTML = `⚠️ ${reason}<br>${ip} / ${office}<br>${stamp}`;
+          
+          // 기기 불일치 에러 시 재등록 요청 섹션 표시
+          if (d.reason === 'DEVICE_MISMATCH') {
+            document.getElementById('deviceRequestSection').classList.remove('hidden');
+            document.getElementById('requestEmpId').value = empId;
+            document.getElementById('requestEmpName').value = empName;
+          } else {
+            document.getElementById('deviceRequestSection').classList.add('hidden');
+          }
         }
       } catch (e) {
         resBox.textContent = '오류가 발생했습니다. 네트워크 상태를 확인해주세요.';
       }
     }
 
+    // 기기 재등록 요청 함수
+    async function requestDeviceUpdate() {
+      const empId = document.getElementById('requestEmpId').value.trim();
+      const empName = document.getElementById('requestEmpName').value.trim();
+      const deviceId = getDeviceId();
+      const resultDiv = document.getElementById('requestResult');
+      const requestBtn = document.getElementById('requestDeviceBtn');
+      
+      if (!empId || !empName) {
+        resultDiv.innerHTML = '<div style="color: red; margin-top: 8px;">사번과 이름을 입력해주세요.</div>';
+        return;
+      }
+      
+      requestBtn.disabled = true;
+      resultDiv.innerHTML = '<div style="margin-top: 8px;">요청 중...</div>';
+      
+      try {
+        const res = await fetch('/attend/request-device-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: empId,
+            name: empName,
+            deviceId: deviceId
+          })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          resultDiv.innerHTML = '<div style="color: green; margin-top: 8px;">✅ 요청이 제출되었습니다. 관리자 승인을 기다려주세요.</div>';
+        } else {
+          resultDiv.innerHTML = `<div style="color: red; margin-top: 8px;">❌ ${data.message || '요청 실패'}</div>`;
+          requestBtn.disabled = false;
+        }
+      } catch (e) {
+        resultDiv.innerHTML = '<div style="color: red; margin-top: 8px;">요청 중 오류가 발생했습니다.</div>';
+        requestBtn.disabled = false;
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       loadIpStatus();
       document.getElementById('submitBtn').addEventListener('click', submitForm);
+      document.getElementById('requestDeviceBtn').addEventListener('click', requestDeviceUpdate);
     });
   </script>
 </head>
@@ -121,6 +176,23 @@
 
   <button id="submitBtn">인증(등록)</button>
   <div class="row" id="result" style="margin-top:12px;"></div>
+
+  <!-- 기기 재등록 요청 섹션 -->
+  <div id="deviceRequestSection" class="row hidden" style="margin-top: 16px; padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
+    <h3 style="margin-top: 0;">기기 재등록 요청</h3>
+    <p><strong>다른 기기에서 등록된 기록이 있습니다.</strong></p>
+    <p>기기를 변경하셨다면 관리자 승인을 받아야 합니다. 아래 정보를 확인하고 요청 버튼을 클릭하세요.</p>
+    <div style="margin: 12px 0;">
+      <label>사번</label><br />
+      <input id="requestEmpId" type="text" placeholder="사번" style="width: 200px; padding: 6px;" />
+    </div>
+    <div style="margin: 12px 0;">
+      <label>이름</label><br />
+      <input id="requestEmpName" type="text" placeholder="이름" style="width: 200px; padding: 6px;" />
+    </div>
+    <button id="requestDeviceBtn" class="primary">기기 재등록 요청</button>
+    <div id="requestResult"></div>
+  </div>
 </body>
 </html>
 

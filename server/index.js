@@ -39,6 +39,12 @@ if (!fs.existsSync(logFile)) {
   fs.writeFileSync(logFile, 'server_time,employee_id,name,ip,file,office,device_id,image_hash\n', { encoding: 'utf8' });
 }
 
+// 기기 재등록 요청 파일 준비
+const deviceRequestsFile = path.join(logsDir, 'device_requests.json');
+if (!fs.existsSync(deviceRequestsFile)) {
+  fs.writeFileSync(deviceRequestsFile, '[]', { encoding: 'utf8' });
+}
+
 // 화이트리스트 IP/CIDR 로드
 const OFFICE_IPS = (process.env.OFFICE_IPS || '')
   .split(',')
@@ -436,6 +442,166 @@ app.get('/admin/download-csv', requireAdmin, (req, res) => {
   } catch (err) {
     console.error('CSV 다운로드 오류:', err);
     return res.status(500).json({ ok: false, message: '다운로드 실패' });
+  }
+});
+
+// ==================== 기기 재등록 요청 기능 ====================
+
+// 기기 재등록 요청 제출 (일반 사용자)
+app.post('/attend/request-device-update', (req, res) => {
+  const { employeeId, name, deviceId } = req.body;
+  const serverTime = getKoreaTime();
+  
+  if (!employeeId || !name || !deviceId) {
+    return res.status(400).json({ ok: false, message: '필수 정보가 누락되었습니다.' });
+  }
+  
+  try {
+    // 기존 요청 확인 (중복 방지)
+    const requests = JSON.parse(fs.readFileSync(deviceRequestsFile, 'utf8'));
+    const pendingRequest = requests.find(r => 
+      r.employeeId === employeeId && 
+      r.status === 'pending' &&
+      r.deviceId === deviceId
+    );
+    
+    if (pendingRequest) {
+      return res.json({ ok: false, message: '이미 대기 중인 요청이 있습니다.' });
+    }
+    
+    // 새 요청 추가
+    const newRequest = {
+      id: Date.now().toString(),
+      employeeId: String(employeeId).trim(),
+      name: String(name).trim(),
+      deviceId: String(deviceId).trim(),
+      requestedAt: serverTime,
+      status: 'pending',
+      approvedAt: null,
+      rejectedAt: null
+    };
+    
+    requests.push(newRequest);
+    fs.writeFileSync(deviceRequestsFile, JSON.stringify(requests, null, 2), { encoding: 'utf8' });
+    
+    return res.json({ ok: true, message: '요청이 제출되었습니다.' });
+  } catch (err) {
+    console.error('기기 재등록 요청 오류:', err);
+    return res.status(500).json({ ok: false, message: '요청 처리 실패' });
+  }
+});
+
+// 대기 중인 요청 목록 조회 (관리자)
+app.get('/admin/device-requests', requireAdmin, (req, res) => {
+  try {
+    if (!fs.existsSync(deviceRequestsFile)) {
+      return res.json({ ok: true, requests: [] });
+    }
+    const requests = JSON.parse(fs.readFileSync(deviceRequestsFile, 'utf8'));
+    const status = req.query.status || 'all';
+    
+    let filtered = requests;
+    if (status === 'pending') {
+      filtered = requests.filter(r => r.status === 'pending');
+    } else if (status === 'approved') {
+      filtered = requests.filter(r => r.status === 'approved');
+    } else if (status === 'rejected') {
+      filtered = requests.filter(r => r.status === 'rejected');
+    }
+    
+    // 최신순 정렬
+    filtered.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+    
+    return res.json({ ok: true, requests: filtered });
+  } catch (err) {
+    console.error('요청 목록 조회 오류:', err);
+    return res.status(500).json({ ok: false, message: '조회 실패' });
+  }
+});
+
+// 요청 승인 (관리자)
+app.post('/admin/approve-device-request', requireAdmin, (req, res) => {
+  const { requestId } = req.body;
+  
+  if (!requestId) {
+    return res.status(400).json({ ok: false, message: '요청 ID가 필요합니다.' });
+  }
+  
+  try {
+    const requests = JSON.parse(fs.readFileSync(deviceRequestsFile, 'utf8'));
+    const request = requests.find(r => r.id === requestId);
+    
+    if (!request) {
+      return res.status(404).json({ ok: false, message: '요청을 찾을 수 없습니다.' });
+    }
+    
+    if (request.status !== 'pending') {
+      return res.status(400).json({ ok: false, message: '이미 처리된 요청입니다.' });
+    }
+    
+    // 기기 ID 업데이트 (기존 로직 재사용)
+    if (!fs.existsSync(logFile)) {
+      return res.status(404).json({ ok: false, message: '등록 기록이 없습니다.' });
+    }
+    
+    const content = fs.readFileSync(logFile, 'utf8');
+    const lines = content.split('\n');
+    let updated = 0;
+    const safeDeviceId = request.deviceId.replace(/,|\r|\n/g, '_');
+    
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length >= 7 && cols[1] === request.employeeId) {
+        cols[6] = safeDeviceId;
+        lines[i] = cols.join(',');
+        updated++;
+      }
+    }
+    
+    if (updated > 0) {
+      fs.writeFileSync(logFile, lines.join('\n'), { encoding: 'utf8' });
+    }
+    
+    // 요청 상태 업데이트
+    request.status = 'approved';
+    request.approvedAt = getKoreaTime();
+    fs.writeFileSync(deviceRequestsFile, JSON.stringify(requests, null, 2), { encoding: 'utf8' });
+    
+    return res.json({ ok: true, updated, message: '요청이 승인되었습니다.' });
+  } catch (err) {
+    console.error('요청 승인 오류:', err);
+    return res.status(500).json({ ok: false, message: '승인 처리 실패' });
+  }
+});
+
+// 요청 거부 (관리자)
+app.post('/admin/reject-device-request', requireAdmin, (req, res) => {
+  const { requestId } = req.body;
+  
+  if (!requestId) {
+    return res.status(400).json({ ok: false, message: '요청 ID가 필요합니다.' });
+  }
+  
+  try {
+    const requests = JSON.parse(fs.readFileSync(deviceRequestsFile, 'utf8'));
+    const request = requests.find(r => r.id === requestId);
+    
+    if (!request) {
+      return res.status(404).json({ ok: false, message: '요청을 찾을 수 없습니다.' });
+    }
+    
+    if (request.status !== 'pending') {
+      return res.status(400).json({ ok: false, message: '이미 처리된 요청입니다.' });
+    }
+    
+    request.status = 'rejected';
+    request.rejectedAt = getKoreaTime();
+    fs.writeFileSync(deviceRequestsFile, JSON.stringify(requests, null, 2), { encoding: 'utf8' });
+    
+    return res.json({ ok: true, message: '요청이 거부되었습니다.' });
+  } catch (err) {
+    console.error('요청 거부 오류:', err);
+    return res.status(500).json({ ok: false, message: '거부 처리 실패' });
   }
 });
 

@@ -59,6 +59,22 @@
       <div id="updateResult" class="hidden"></div>
     </div>
 
+    <!-- 기기 재등록 요청 관리 -->
+    <div class="section">
+      <h3>기기 재등록 요청 관리</h3>
+      <div>
+        <label>상태 필터</label>
+        <select id="requestStatusFilter" onchange="loadDeviceRequests()">
+          <option value="all">전체</option>
+          <option value="pending" selected>대기 중</option>
+          <option value="approved">승인됨</option>
+          <option value="rejected">거부됨</option>
+        </select>
+        <button class="primary" onclick="loadDeviceRequests()">새로고침</button>
+      </div>
+      <div id="deviceRequestsTable"></div>
+    </div>
+
     <!-- 등록 기록 조회 -->
     <div class="section">
       <h3>등록 기록 조회</h3>
@@ -92,6 +108,7 @@
           document.getElementById('loginForm').classList.add('hidden');
           document.getElementById('adminPanel').classList.remove('hidden');
           loadRecords();
+          loadDeviceRequests();
         } else {
           logout();
         }
@@ -125,6 +142,7 @@
           document.getElementById('adminPanel').classList.remove('hidden');
           errorDiv.classList.add('hidden');
           loadRecords();
+          loadDeviceRequests();
         } else {
           errorDiv.textContent = data.message || '로그인 실패';
           errorDiv.classList.remove('hidden');
@@ -242,6 +260,113 @@
         }
       } catch (e) {
         alert('CSV 다운로드 중 오류가 발생했습니다.');
+      }
+    }
+
+    // 기기 재등록 요청 목록 조회
+    async function loadDeviceRequests() {
+      const status = document.getElementById('requestStatusFilter').value;
+      const url = `/admin/device-requests?status=${status}`;
+      
+      try {
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          displayDeviceRequests(data.requests);
+        } else {
+          alert('요청 목록 조회 실패: ' + (data.message || '알 수 없는 오류'));
+        }
+      } catch (e) {
+        alert('요청 목록 조회 중 오류가 발생했습니다.');
+      }
+    }
+
+    // 기기 재등록 요청 목록 표시
+    function displayDeviceRequests(requests) {
+      const tableDiv = document.getElementById('deviceRequestsTable');
+      if (!requests || requests.length === 0) {
+        tableDiv.innerHTML = '<p>요청이 없습니다.</p>';
+        return;
+      }
+
+      let html = '<table><thead><tr><th>요청일시</th><th>사번</th><th>이름</th><th>기기 ID</th><th>상태</th><th>처리일시</th><th>작업</th></tr></thead><tbody>';
+      requests.forEach(req => {
+        const statusBadge = req.status === 'pending' ? '<span style="color: orange;">⏳ 대기</span>' : 
+                        req.status === 'approved' ? '<span style="color: green;">✅ 승인</span>' : 
+                        '<span style="color: red;">❌ 거부</span>';
+        const processTime = req.approvedAt || req.rejectedAt || '-';
+        const actions = req.status === 'pending' ? 
+          `<button class="primary" onclick="approveRequest('${req.id}')">승인</button>
+           <button class="danger" onclick="rejectRequest('${req.id}')">거부</button>` : 
+          '-';
+        
+        html += `<tr>
+          <td>${req.requestedAt || '-'}</td>
+          <td>${req.employeeId || '-'}</td>
+          <td>${req.name || '-'}</td>
+          <td style="font-size: 0.85em; word-break: break-all;">${req.deviceId || '-'}</td>
+          <td>${statusBadge}</td>
+          <td>${processTime}</td>
+          <td>${actions}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      tableDiv.innerHTML = html;
+    }
+
+    // 요청 승인
+    async function approveRequest(requestId) {
+      if (!confirm('이 요청을 승인하시겠습니까? 승인하면 해당 사번의 모든 등록 기록의 기기 ID가 업데이트됩니다.')) return;
+      
+      try {
+        const res = await fetch('/admin/approve-device-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({ requestId })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          alert(`✅ 승인 완료 (${data.updated}개 기록 업데이트)`);
+          loadDeviceRequests();
+          loadRecords(); // 등록 기록도 새로고침
+        } else {
+          alert('❌ ' + (data.message || '승인 실패'));
+        }
+      } catch (e) {
+        alert('승인 처리 중 오류가 발생했습니다.');
+      }
+    }
+
+    // 요청 거부
+    async function rejectRequest(requestId) {
+      if (!confirm('이 요청을 거부하시겠습니까?')) return;
+      
+      try {
+        const res = await fetch('/admin/reject-device-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({ requestId })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          alert('✅ 거부 완료');
+          loadDeviceRequests();
+        } else {
+          alert('❌ ' + (data.message || '거부 실패'));
+        }
+      } catch (e) {
+        alert('거부 처리 중 오류가 발생했습니다.');
       }
     }
   </script>
