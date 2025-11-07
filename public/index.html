@@ -32,7 +32,7 @@
       const curIp = document.getElementById('curIp');
       const curOffice = document.getElementById('curOffice');
       try {
-        const r = await fetch('/ip-status', { cache: 'no-store' });
+        const r = await fetch('/api/ip-status', { cache: 'no-store' });
         const d = await r.json();
         curIp.textContent = d.ip || '-';
         if (d.office) {
@@ -118,7 +118,7 @@
       submitBtn.disabled = true;
 
       try {
-        const r = await fetch('/attend/register', { method: 'POST', body: form });
+        const r = await fetch('/api/attend/register', { method: 'POST', body: form });
         const d = await r.json();
         const ip = d.ip ? `IP: ${d.ip}` : 'IP: -';
         const office = d.office ? '사내망' : '사내망 아님';
@@ -184,7 +184,7 @@
       resultDiv.innerHTML = '<div style="margin-top: 8px;">요청 중...</div>';
       
       try {
-        const res = await fetch('/attend/request-device-update', {
+        const res = await fetch('/api/attend/request-device-update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

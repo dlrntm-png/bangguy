@@ -173,7 +173,7 @@
       if (!confirm(`${selectedRecordIds.size}개의 기록을 삭제하시겠습니까?\n관련 사진 파일도 함께 삭제됩니다.`)) return;
 
       try {
-        const res = await fetch('/admin/delete-records', {
+        const res = await fetch('/api/admin/delete-records', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -203,7 +203,7 @@
       if (!confirm(`총 ${cachedRecords.length}건의 모든 기록을 삭제하시겠습니까?\n관련 사진 파일도 함께 삭제됩니다.`)) return;
 
       try {
-        const res = await fetch('/admin/delete-records', {
+        const res = await fetch('/api/admin/delete-records', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -227,7 +227,7 @@
 
     async function checkAuth() {
       try {
-        const res = await fetch('/admin/check', {
+        const res = await fetch('/api/admin/check', {
           headers: { 'Authorization': `Bearer ${adminToken}` }
         });
         if (res.ok) {
@@ -254,7 +254,7 @@
       }
 
       try {
-        const res = await fetch('/admin/login', {
+        const res = await fetch('/api/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password })
@@ -289,7 +289,7 @@
 
     async function loadRecords() {
       const empId = document.getElementById('searchEmpId').value.trim();
-      const url = empId ? `/admin/records?employeeId=${empId}` : '/admin/records';
+      const url = empId ? `/api/admin/records?employeeId=${empId}` : '/api/admin/records';
       
       try {
         const res = await fetch(url, {
@@ -339,9 +339,17 @@
 
       let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>IP</th><th>기기 ID</th><th>사내망</th><th>사진</th><th>작업</th></tr></thead><tbody>';
       records.forEach(record => {
-        const fileName = record.file || '';
-        const imageUrl = fileName && fileName !== '-' ? `/uploads/${encodeURIComponent(fileName)}` : '';
-        const hasImage = fileName && fileName !== '-';
+        const imageUrl = record.file || '';
+        const hasImage = Boolean(imageUrl);
+        let displayFile = '-';
+        if (imageUrl) {
+          try {
+            const parts = imageUrl.split('/');
+            displayFile = decodeURIComponent(parts[parts.length - 1] || imageUrl).slice(-100);
+          } catch {
+            displayFile = imageUrl.slice(-100);
+          }
+        }
         
         html += `<tr>
           <td><input type="checkbox" class="record-checkbox" data-id="${record.recordId}" onchange="toggleRecordSelection(this)" /></td>
@@ -350,22 +358,22 @@
           <td>${record.name || '-'}</td>
           <td style="font-family: monospace;">${record.ip || '-'}</td>
           <td style="font-size: 0.85em; word-break: break-all; max-width: 200px;">${record.device_id || '-'}</td>
-          <td>${record.office === 'true' ? '<span style="color: green;">✅</span>' : '<span style="color: red;">❌</span>'}</td>
+          <td>${record.office ? '<span style="color: green;">✅</span>' : '<span style="color: red;">❌</span>'}</td>
           <td>
             ${hasImage ? `
               <div style="position: relative; display: inline-block;">
                 <img src="${imageUrl}" 
                      alt="미리보기" 
                      class="photo-preview"
-                     onclick="showImageModal('${imageUrl}', '${fileName.replace(/'/g, "\\'")}')" />
-                <div style="margin-top: 4px; font-size: 0.85em; color: #666; max-width: 100px; word-break: break-all;">${fileName}</div>
+                     onclick="showImageModal('${imageUrl}', '${displayFile.replace(/'/g, "\\'")}')" />
+                <div style="margin-top: 4px; font-size: 0.85em; color: #666; max-width: 180px; word-break: break-all;">${displayFile}</div>
               </div>
             ` : '<span style="color: #999;">-</span>'}
           </td>
           <td>
             ${hasImage ? `
-              <button class="danger" onclick="deletePhoto('${fileName.replace(/'/g, "\\'")}', '${(record.employee_id || '').replace(/'/g, "\\'")}')" 
-                      style="padding: 4px 8px; font-size: 12px;">삭제</button>
+              <button class="danger" onclick="deletePhoto(${record.recordId}, '${(record.employee_id || '').replace(/'/g, "\\'")}')" 
+                      style="padding: 4px 8px; font-size: 12px;">사진 삭제</button>
             ` : '-'}
           </td>
         </tr>`;
@@ -407,19 +415,19 @@
     }
 
     // 사진 삭제 함수
-    async function deletePhoto(filename, employeeId) {
-      if (!confirm(`이 사진을 삭제하시겠습니까?\n\n파일: ${filename}\n사번: ${employeeId || '-'}\n\n삭제된 사진은 복구할 수 없습니다.`)) {
+    async function deletePhoto(recordId, employeeId) {
+      if (!confirm(`이 사진을 삭제하시겠습니까?\n\n사번: ${employeeId || '-'}\n\n삭제된 사진은 복구할 수 없습니다.`)) {
         return;
       }
       
       try {
-        const res = await fetch('/admin/delete-photo', {
+        const res = await fetch('/api/admin/delete-photo', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${adminToken}`
           },
-          body: JSON.stringify({ filename })
+          body: JSON.stringify({ recordId })
         });
         
         const data = await res.json();
@@ -448,7 +456,7 @@
       }
 
       try {
-        const res = await fetch('/admin/update-device', {
+        const res = await fetch('/api/admin/update-device', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -474,7 +482,7 @@
 
     async function downloadCSV() {
       try {
-        const res = await fetch('/admin/download-csv', {
+        const res = await fetch('/api/admin/download-csv', {
           headers: { 'Authorization': `Bearer ${adminToken}` }
         });
         if (res.ok) {
@@ -498,7 +506,7 @@
     // 기기 재등록 요청 목록 조회
     async function loadDeviceRequests() {
       const status = document.getElementById('requestStatusFilter').value;
-      const url = `/admin/device-requests?status=${status}`;
+      const url = `/api/admin/device-requests?status=${status}`;
       
       try {
         const res = await fetch(url, {
@@ -583,7 +591,7 @@
       tableDiv.classList.add('loading');
       
       try {
-        const res = await fetch('/admin/approve-device-request', {
+        const res = await fetch('/api/admin/approve-device-request', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -616,7 +624,7 @@
       tableDiv.classList.add('loading');
       
       try {
-        const res = await fetch('/admin/reject-device-request', {
+        const res = await fetch('/api/admin/reject-device-request', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
