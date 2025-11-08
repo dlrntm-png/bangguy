@@ -55,6 +55,26 @@
       <button onclick="logout()">로그아웃</button>
     </div>
 
+    <!-- 관리자 비밀번호 변경 -->
+    <div class="section">
+      <h3>관리자 비밀번호 변경</h3>
+      <p>현재 비밀번호 확인 후 바로 새 비밀번호로 변경할 수 있습니다. 새 비밀번호는 최소 8자 이상으로 설정해주세요.</p>
+      <div id="passwordChangeMessage" class="hidden"></div>
+      <div>
+        <label>현재 비밀번호</label>
+        <input type="password" id="currentAdminPassword" placeholder="현재 비밀번호" autocomplete="current-password" />
+      </div>
+      <div>
+        <label>새 비밀번호</label>
+        <input type="password" id="newAdminPassword" placeholder="새 비밀번호 (8자 이상)" autocomplete="new-password" />
+      </div>
+      <div>
+        <label>새 비밀번호 확인</label>
+        <input type="password" id="confirmAdminPassword" placeholder="새 비밀번호 확인" autocomplete="new-password" />
+      </div>
+      <button class="primary" id="changePasswordBtn" onclick="changeAdminPassword()">비밀번호 변경</button>
+    </div>
+
     <!-- 기기 ID 업데이트 -->
     <div class="section">
       <h3>기기 ID 업데이트</h3>
@@ -143,6 +163,87 @@
       if (selectAll) {
         selectAll.checked = cachedRecords.length > 0 && selectedRecordIds.size === cachedRecords.length;
         selectAll.indeterminate = selectedRecordIds.size > 0 && selectedRecordIds.size < cachedRecords.length;
+      }
+    }
+
+    function clearPasswordChangeMessage() {
+      const box = document.getElementById('passwordChangeMessage');
+      if (!box) return;
+      box.textContent = '';
+      box.classList.add('hidden');
+      box.classList.remove('error', 'success');
+    }
+
+    function setPasswordChangeMessage(type, message) {
+      const box = document.getElementById('passwordChangeMessage');
+      if (!box) return;
+      box.textContent = message;
+      box.classList.remove('hidden', 'error', 'success');
+      box.classList.add(type === 'success' ? 'success' : 'error');
+    }
+
+    async function changeAdminPassword() {
+      const currentInput = document.getElementById('currentAdminPassword');
+      const newInput = document.getElementById('newAdminPassword');
+      const confirmInput = document.getElementById('confirmAdminPassword');
+      const submitBtn = document.getElementById('changePasswordBtn');
+
+      const currentPassword = currentInput.value;
+      const newPassword = newInput.value;
+      const confirmPassword = confirmInput.value;
+
+      clearPasswordChangeMessage();
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        setPasswordChangeMessage('error', '모든 입력 칸을 채워주세요.');
+        return;
+      }
+
+      if (newPassword.length < 8) {
+        setPasswordChangeMessage('error', '새 비밀번호는 최소 8자 이상이어야 합니다.');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setPasswordChangeMessage('error', '새 비밀번호가 서로 일치하지 않습니다.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.classList.add('loading');
+
+      try {
+        const res = await fetch('/api/admin/change-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+        });
+
+        const data = await res.json();
+
+        if (res.status === 401) {
+          alert('인증이 만료되었거나 권한이 없습니다. 다시 로그인해주세요.');
+          logout();
+          return;
+        }
+
+        if (data.ok) {
+          setPasswordChangeMessage('success', data.message || '비밀번호가 변경되었습니다.');
+          currentInput.value = '';
+          newInput.value = '';
+          confirmInput.value = '';
+        } else {
+          setPasswordChangeMessage('error', data.message || '비밀번호 변경에 실패했습니다.');
+        }
+      } catch (err) {
+        console.error('change password error:', err);
+        setPasswordChangeMessage('error', '비밀번호 변경 중 오류가 발생했습니다.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('loading');
       }
     }
 
@@ -285,6 +386,13 @@
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('adminPanel').classList.add('hidden');
       document.getElementById('adminPassword').value = '';
+      const currentInput = document.getElementById('currentAdminPassword');
+      const newInput = document.getElementById('newAdminPassword');
+      const confirmInput = document.getElementById('confirmAdminPassword');
+      if (currentInput) currentInput.value = '';
+      if (newInput) newInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+      clearPasswordChangeMessage();
     }
 
     async function loadRecords() {
