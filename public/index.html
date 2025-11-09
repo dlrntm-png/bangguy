@@ -209,8 +209,6 @@
       try {
         const r = await fetch('/api/attend/register', { method: 'POST', body: form });
         const d = await r.json();
-        const ip = d.ip ? `IP: ${d.ip}` : 'IP: -';
-        const office = d.office ? '사내망' : '사내망 아님';
         // 한국 시간 형식으로 변환 (YYYY-MM-DD HH:mm:ss)
         let stamp = '';
         if (d.serverTime) {
@@ -228,7 +226,8 @@
           stamp = `시간: ${koreaTime}`;
         }
         if (d.ok) {
-          resBox.innerHTML = `✅ ${d.message || '등록 완료'}<br>${ip} / ${office}<br>${stamp}`;
+          const stampLine = stamp ? `<br>${stamp}` : '';
+          resBox.innerHTML = `✅ ${d.message || '등록 완료'}${stampLine}`;
           document.getElementById('deviceRequestSection').classList.add('hidden');
           // 등록 성공 시 입력 필드 초기화
           setTimeout(() => {
@@ -237,7 +236,8 @@
           }, 3000); // 3초 후 초기화
         } else {
           const reason = d.message || d.error || '등록 실패';
-          resBox.innerHTML = `⚠️ ${reason}<br>${ip} / ${office}<br>${stamp}`;
+          const stampLine = stamp ? `<br>${stamp}` : '';
+          resBox.innerHTML = `⚠️ ${reason}${stampLine}`;
           
           // 기기 불일치 에러 시 재등록 요청 섹션 표시
           if (d.reason === 'DEVICE_MISMATCH') {
@@ -246,7 +246,7 @@
             document.getElementById('requestEmpName').value = empName;
           } else if (d.reason === 'NOT_OFFICE_IP') {
             document.getElementById('deviceRequestSection').classList.add('hidden');
-            const lines = [`${reason}`, `${ip} / ${office}`];
+            const lines = [`${reason}`];
             if (stamp) {
               lines.push(stamp);
             }
