@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: false,
         reason: 'NOT_OFFICE_IP',
-        message: '사내 공인 IP가 아닙니다. 사내 Wi‑Fi/VPN 접속 후 다시 시도해주세요.',
+        message: 'DCMC_WIFI가 아닙니다. DCMC_WIFI 접속 후 다시 시도 해주세요.',
         ip,
         office,
         serverTime
