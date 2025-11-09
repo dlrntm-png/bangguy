@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+    body.modal-open { overflow: hidden; }
     .row { margin: 8px 0; }
     .badge { display:inline-block; padding:2px 6px; border-radius:4px; background:#eee; margin-left:6px; }
     .ok { background:#d1fae5; }
@@ -15,8 +16,64 @@
     button.primary { padding: 8px 16px; background: #007bff; color: white; border: 1px solid #007bff; border-radius: 4px; cursor: pointer; }
     button.primary:hover { background: #0056b3; }
     button.primary:disabled { background: #ccc; cursor: not-allowed; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 1000;
+      padding: 24px;
+    }
+    .modal-overlay.show {
+      display: flex;
+    }
+    .modal-dialog {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px 28px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+      text-align: center;
+      animation: popIn 0.25s ease-out;
+    }
+    .modal-dialog h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 20px;
+    }
+    .modal-dialog p {
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .modal-close-btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .modal-close-btn:hover {
+      background: #0056b3;
+    }
+    @keyframes popIn {
+      from {
+        transform: scale(0.92);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
   </style>
   <script>
+    let lastFocusedElement = null;
+
     // 기기 고유 ID 생성/조회 함수
     function getDeviceId() {
       let deviceId = localStorage.getItem('attendance_device_id');
@@ -46,6 +103,38 @@
         curIp.textContent = '조회 실패';
         curOffice.textContent = '-';
       }
+    }
+
+    function showBlockingModal(message, title = '사내망 확인 필요') {
+      const overlay = document.getElementById('modalOverlay');
+      const titleEl = document.getElementById('modalTitle');
+      const messageEl = document.getElementById('modalMessage');
+      if (!overlay || !titleEl || !messageEl) return;
+
+      lastFocusedElement = document.activeElement;
+      titleEl.textContent = title;
+      messageEl.innerHTML = message;
+
+      overlay.classList.add('show');
+      document.body.classList.add('modal-open');
+
+      const closeBtn = document.getElementById('modalCloseBtn');
+      if (closeBtn) {
+        closeBtn.focus();
+      }
+    }
+
+    function hideBlockingModal() {
+      const overlay = document.getElementById('modalOverlay');
+      if (!overlay) return;
+
+      overlay.classList.remove('show');
+      document.body.classList.remove('modal-open');
+
+      if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+        lastFocusedElement.focus();
+      }
+      lastFocusedElement = null;
     }
 
     // 사진 미리보기 함수
@@ -155,6 +244,13 @@
             document.getElementById('deviceRequestSection').classList.remove('hidden');
             document.getElementById('requestEmpId').value = empId;
             document.getElementById('requestEmpName').value = empName;
+          } else if (d.reason === 'NOT_OFFICE_IP') {
+            document.getElementById('deviceRequestSection').classList.add('hidden');
+            const lines = [`${reason}`, `${ip} / ${office}`];
+            if (stamp) {
+              lines.push(stamp);
+            }
+            showBlockingModal(lines.filter(Boolean).join('<br>'));
           } else {
             document.getElementById('deviceRequestSection').classList.add('hidden');
           }
@@ -212,6 +308,18 @@
       document.getElementById('submitBtn').addEventListener('click', submitForm);
       document.getElementById('requestDeviceBtn').addEventListener('click', requestDeviceUpdate);
       
+      const closeBtn = document.getElementById('modalCloseBtn');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', hideBlockingModal);
+      }
+      document.addEventListener('keydown', (event) => {
+        const overlay = document.getElementById('modalOverlay');
+        if (overlay?.classList.contains('show') && event.key === 'Escape') {
+          event.preventDefault();
+          hideBlockingModal();
+        }
+      });
+
       // 사진 선택 시 미리보기 표시
       document.getElementById('photo').addEventListener('change', (e) => {
         const file = e.target.files?.[0];
@@ -270,6 +378,14 @@
     </div>
     <button id="requestDeviceBtn" class="primary">기기 재등록 요청</button>
     <div id="requestResult"></div>
+  </div>
+
+  <div id="modalOverlay" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalMessage">
+    <div class="modal-dialog">
+      <h3 id="modalTitle">사내망 확인 필요</h3>
+      <p id="modalMessage">사내 공인 IP가 아닙니다. 사내 Wi‑Fi/VPN 접속 후 다시 시도해주세요.</p>
+      <button id="modalCloseBtn" type="button" class="modal-close-btn">확인</button>
+    </div>
   </div>
 </body>
 </html>
