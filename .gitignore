@@ -43,6 +43,7 @@ desktop.ini
 # Build outputs (if any)
 dist/
 build/
+.next/
 
 # Coverage reports
 coverage/
