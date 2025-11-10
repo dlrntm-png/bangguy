@@ -82,6 +82,10 @@
   <script>
     let lastFocusedElement = null;
     const consentCache = {};
+    const STORAGE_KEYS = {
+      employeeId: 'attendance_emp_id',
+      employeeName: 'attendance_emp_name'
+    };
 
     // 기기 고유 ID 생성/조회 함수
     function getDeviceId() {
@@ -235,6 +239,35 @@
       return { ok: false, consented: false };
     }
 
+    function storeUserInfo(empId, empName) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.employeeId, empId);
+        localStorage.setItem(STORAGE_KEYS.employeeName, empName);
+      } catch (err) {
+        console.warn('사용자 정보 저장 실패:', err);
+      }
+    }
+
+    function restoreUserInfo() {
+      try {
+        const storedId = localStorage.getItem(STORAGE_KEYS.employeeId);
+        const storedName = localStorage.getItem(STORAGE_KEYS.employeeName);
+        if (storedId) document.getElementById('empId').value = storedId;
+        if (storedName) document.getElementById('empName').value = storedName;
+      } catch (err) {
+        console.warn('사용자 정보 복원 실패:', err);
+      }
+    }
+
+    function clearStoredUserInfo() {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.employeeId);
+        localStorage.removeItem(STORAGE_KEYS.employeeName);
+      } catch (err) {
+        console.warn('사용자 정보 삭제 실패:', err);
+      }
+    }
+
     async function submitForm(skipConsentCheck = false) {
       const empId = document.getElementById('empId').value.trim();
       const empName = document.getElementById('empName').value.trim();
@@ -303,6 +336,7 @@
         if (d.ok) {
           const stampLine = stamp ? `<br>${stamp}` : '';
           resBox.innerHTML = `✅ ${d.message || '등록 완료'}${stampLine}`;
+          storeUserInfo(empId, empName);
           document.getElementById('deviceRequestSection').classList.add('hidden');
           // 등록 성공 시 입력 필드 초기화
           setTimeout(() => {
@@ -380,6 +414,8 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       loadIpStatus();
+      restoreUserInfo();
+
       document.getElementById('submitBtn').addEventListener('click', () => submitForm());
       document.getElementById('requestDeviceBtn').addEventListener('click', requestDeviceUpdate);
       
