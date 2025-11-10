@@ -21,8 +21,11 @@ export default async function handler(req, res) {
 
   try {
     const record = await getAdminPasswordHash();
-    if (record?.password_hash) {
-      const valid = verifyPasswordHash(password, record.password_hash);
+    const envHash = (process.env.ADMIN_PASSWORD_HASH || '').trim() || null;
+    const storedHash = record?.password_hash || envHash;
+
+    if (storedHash) {
+      const valid = verifyPasswordHash(password, storedHash);
       if (!valid) {
         return res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' });
       }

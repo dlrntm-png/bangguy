@@ -41,7 +41,8 @@ export default async function handler(req, res) {
 
   try {
     const record = await getAdminPasswordHash();
-    const storedHash = record?.password_hash || null;
+    const envHash = (process.env.ADMIN_PASSWORD_HASH || '').trim() || null;
+    const storedHash = record?.password_hash || envHash;
 
     if (!storedHash && !fallbackPassword) {
       return res.status(503).json({
