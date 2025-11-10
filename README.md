@@ -1,6 +1,6 @@
 # 출퇴근 인증 시스템 (Next.js + Vercel)
 
-사번, 이름, 사진을 기반으로 출퇴근을 기록하고, 요청자의 공인 IP가 사내망에 속하는지 판정하는 시스템입니다. 기존 Express 서버 구조를 Vercel에서 동작하도록 전면 개편하여 **서버리스 함수 + 인메모리 저장소 + Vercel Blob** 조합으로 동작합니다.
+사번, 이름, 사진을 기반으로 출퇴근을 기록하고, 요청자의 공인 IP가 사내망에 속하는지 판정하는 시스템입니다. 기존 Express 서버 구조를 Vercel에서 동작하도록 전면 개편하여 **서버리스 함수 + Supabase Postgres + Vercel Blob** 조합으로 동작합니다.
 
 ## 핵심 기능
 - **사내망 판정**: `OFFICE_IPS` 화이트리스트(CIDR 지원)를 사용하여 접속 IP의 사내망 여부 판단
@@ -21,7 +21,7 @@
 ## 기술 스택
 - **Frontend**: 정적 HTML (`public/index.html`, `public/admin.html`)
 - **Backend**: Next.js API Routes (서버리스 함수)
-- **Storage**: 인메모리 저장소(재시작 시 초기화), Vercel Blob (이미지 파일)
+- **Storage**: Supabase Postgres (메타데이터), Vercel Blob (이미지 파일)
 - **인증**: 관리자 JWT (24시간 만료)
 
 ## 프로젝트 구조
@@ -46,9 +46,16 @@
 | `ADMIN_PASSWORD_HASH` | `npm run admin:hash -- "비밀번호"` 명령으로 생성한 PBKDF2 해시. 설정되면 평문 `ADMIN_PASSWORD` 대신 사용됨 (미설정 시 기본 해시가 사용됨)
 | `ADMIN_JWT_SECRET` | 관리자 JWT 서명용 시크릿 문자열 (임의의 긴 문자열, 로컬 Mock 모드에서는 미설정 시 기본 시크릿 사용)
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 프로젝트에서 발급한 Read/Write 토큰 |
+| `POSTGRES_URL` | Supabase Postgres 연결 문자열 (`postgres://...`) |
+| `POSTGRES_SSL` | (선택) `disable` 또는 `require` 등 SSL 모드 지정, 기본값 `require` |
+| `SUPABASE_DB_PASSWORD` | (대안) Supabase DB 비밀번호. `POSTGRES_URL` 대신 자동으로 연결 문자열을 구성할 때 사용 |
+| `SUPABASE_PROJECT_ID` | (대안) Supabase 프로젝트 ID (예: `iwtkumlqavwcmfsxjdvp`). `SUPABASE_DB_PASSWORD`와 함께 사용 |
+| `SUPABASE_DB_USER` | (선택) DB 사용자명, 기본값 `postgres` |
+| `SUPABASE_DB_NAME` | (선택) DB 이름, 기본값 `postgres` |
+| `SUPABASE_DB_PORT` | (선택) DB 포트, 기본값 `5432` |
 | `UPLOAD_MAX_WIDTH` | (선택) 업로드 이미지 최대 가로폭(px). 기본 1280 |
 | `UPLOAD_WEBP_QUALITY` | (선택) WebP 품질(1~100). 기본 80 |
-| `MOCK_DB` | (선택) `true` 로 설정하면 관리자 인증에서 개발용 기본 비밀번호 허용 |
+| `MOCK_DB` | (선택) `true` 로 설정하면 로컬에서 메모리 DB를 사용 (재시작 시 초기화) |
 | `MOCK_BLOB` | (선택) `true` 로 설정하면 Vercel Blob 대신 `public/mock-uploads/`에 파일을 저장 |
 | `RESEND_API_KEY` | (선택) Resend 이메일 API 키. 월별 정리 알림에 사용 |
 | `RESEND_FROM_EMAIL` | (선택) 발신자 이메일 주소. 기본값 `noreply@attendance.local` |
@@ -57,7 +64,7 @@
 | `BLOB_PUBLIC_BASE_URL` | (선택) Blob 다운로드용 커스텀 도메인이 있을 때 설정 |
 | `ALLOW_DEV_ADMIN_PASSWORD` | (선택) `false`로 설정하면 개발 환경에서도 기본 관리자 비밀번호 사용을 차단 |
 
-> **주의**: 현재 버전은 모든 메타데이터를 메모리에만 보관합니다. 서버리스 함수가 재시작되거나 스케일링되면 데이터가 초기화되니, 영구 저장이 필요하면 별도의 데이터베이스 연동을 직접 구현해야 합니다.
+> **로컬 개발 시** `.env.local` 에 Supabase Connection string을 그대로 넣으면 동일하게 동작합니다.
 
 ## 로컬 개발
 ```bash
@@ -90,7 +97,8 @@ npm run admin:hash -- "강력한비밀번호!"
 - 사용자 페이지: `/` → 현재 IP/사내망 여부 + 출퇴근 등록
 - 관리자 페이지: `/admin.html`
 - API 로그는 터미널(서버리스 함수 실행 시 콘솔)에서 확인
-- 로컬에서 빠르게 확인하려면 `.env.local` 에 `MOCK_BLOB=true`, `OFFICE_IPS=175.120.139.0/24,127.0.0.1/32,::1/128` 를 지정하세요.  
+- 로컬에서 빠르게 확인하려면 `.env.local` 에 `MOCK_DB=true`, `MOCK_BLOB=true`, `OFFICE_IPS=175.120.139.0/24,127.0.0.1/32,::1/128` 를 지정하세요.  
+  - Mock DB는 메모리에 데이터를 저장하며 서버 재시작 시 초기화됩니다.  
   - Mock Blob은 `public/mock-uploads/` 폴더에 WebP/CSV 파일을 저장하며 `.gitignore`에 포함되어 있어 Git에 커밋되지 않습니다.
 
 ## Vercel 배포 절차
@@ -100,8 +108,12 @@ npm run admin:hash -- "강력한비밀번호!"
    - `ADMIN_PASSWORD`
    - `ADMIN_JWT_SECRET`
    - `BLOB_READ_WRITE_TOKEN` (Vercel Blob 대시보드에서 발급)
-3. **Blob 연결**
+   - `POSTGRES_URL` (Supabase Dashboard → Project Settings → Database → Connection string → `URI` 항목)
+     - 또는 `SUPABASE_PROJECT_ID` + `SUPABASE_DB_PASSWORD` 조합으로 자동 구성 가능
+   - (선택) `POSTGRES_SSL` (`require`/`prefer`/`disable` 등 Supabase 정책에 맞게 지정)
+3. **Blob & DB 연결**
    - Vercel Dashboard → Storage → Blob 에서 Read/Write Token 발급 → 환경 변수 저장
+   - Supabase → Database 인스턴스 생성 → Connection string을 `POSTGRES_URL`로 설정
 4. **추가 설정** (선택)
    - Team/Pro 플랜이 아니라면 이미지 용량 제한(5MB)과 Blob 사용량을 모니터링하세요.
    - `vercel-build` 스크립트는 `next build`로 구성되어 있으므로 추가 설정 불필요
@@ -138,7 +150,7 @@ npm run admin:hash -- "강력한비밀번호!"
 ## 운영/모니터링 팁
 - **로그 확인**: Vercel Functions 로그에서 API 호출 오류를 확인할 수 있습니다.
 - **Blob 용량 관리**: 불필요한 기록을 주기적으로 정리하여 저장 공간 절약
-- **데이터 백업**: 메모리 저장소 특성상 재시작 시 데이터가 초기화됩니다. 영구 보관이 필요하면 별도 DB 연동 또는 CSV 백업을 수동으로 관리하세요.
+- **Postgres 백업**: Supabase는 PITR/백업 기능을 제공하므로 콘솔에서 주기적으로 백업 설정을 확인
 - **보안**: `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`은 강력한 값으로 설정하고 주기적으로 교체
 - **HTTPS & 보안 헤더**: `middleware.js`를 통해 HSTS, CSP, X-Frame-Options, Referrer-Policy 등을 모든 관리자/API 응답에 적용
 - **관리자 비밀번호**: `ADMIN_PASSWORD_HASH` 설정을 권장하고, 필요 시 `ALLOW_DEV_ADMIN_PASSWORD=false`로 기본 비밀번호를 비활성화
@@ -154,9 +166,16 @@ npm run admin:hash -- "강력한비밀번호!"
   - 알림 메일을 받으려면 `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `CLEANUP_NOTIFY_EMAILS` 환경 변수를 설정하세요.
   - CSV 파일에는 사진 URL/Blob 경로가 포함되므로, 삭제 전에 다운로드하여 로컬 NAS/백업 디스크에 보관할 수 있습니다.
 
+## Supabase 설정 요약
+1. [Supabase](https://supabase.com) 프로젝트를 생성합니다.
+2. `Project Settings → Database → Connection string`에서 `URI` 값을 복사합니다.
+3. Vercel 프로젝트의 `Settings → Environment Variables`에 `POSTGRES_URL` (필수), `POSTGRES_SSL`(선택) 값을 입력하고 저장합니다.
+4. 재배포 후 `/api/attend/register` 호출 시 Supabase에 출퇴근 기록이 저장됩니다.
+   - `POSTGRES_URL`을 직접 넣지 않고 `SUPABASE_PROJECT_ID` + `SUPABASE_DB_PASSWORD`를 사용하면 코드가 자동으로 `postgres://` URI를 생성합니다.
+
 ## 마이그레이션 참고 (이전 Express 버전 → Vercel 버전)
 - 로컬 디스크에 저장하던 업로드 파일 → Vercel Blob
-- CSV 기반 기록 관리 → (임시) 인메모리 저장소 보관
+- CSV 기반 기록 관리 → Supabase Postgres 테이블 보관
 - Express 서버 → Next.js API Routes (자동 확장 & 서버리스 실행)
 - 관리자 토큰 메모리 저장 → JWT 기반(멱등), 서버리스 환경에서도 유지
 
@@ -165,7 +184,7 @@ npm run admin:hash -- "강력한비밀번호!"
 | --- | --- |
 | `Error: BLOB_READ_WRITE_TOKEN` | Vercel Blob RW 토큰이 미설정 → 대시보드에서 발급 후 환경 변수 추가 |
 | `Error: ADMIN_JWT_SECRET` | 관리자 JWT 비밀키 미설정 → `.env.local` 또는 Vercel 환경 변수에 추가 |
-| 데이터가 사라짐 | 인메모리 저장소 특성상 함수 재시작 시 초기화 → 별도 백업/DB 연동 필요 |
+| `ETIMEDOUT` / DB 연결 오류 | `POSTGRES_URL` 오타, 권한 문제, Supabase 인스턴스 상태/방화벽 확인 |
 | 이미지 미리보기 실패 | Blob 접근 권한 확인 (기본 `public`로 업로드), URL 차단 여부 확인 |
 | 등록 시 500 오류 | Vercel Functions 로그 확인 → Blob/DB 토큰, IP 리스트, 요청 본문 검증 |
 
