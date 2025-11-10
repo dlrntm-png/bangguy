@@ -1,5 +1,5 @@
 import { verifyAdminToken } from '../../../lib/adminAuth';
-import { getAllConsentLogs } from '../../../lib/consent';
+import { getConsentLogs } from '../../../lib/consent';
 import { buildCsv } from '../../../lib/csv';
 
 export default async function handler(req, res) {
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const logs = await getAllConsentLogs();
+    const logs = await getConsentLogs();
     if (!logs || logs.length === 0) {
       return res.status(204).end();
     }
