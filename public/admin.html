@@ -527,7 +527,11 @@
         background: rgba(0,0,0,0.8); z-index: 10000; display: flex;
         align-items: center; justify-content: center; cursor: pointer;
       `;
-      modal.onclick = () => document.body.removeChild(modal);
+      modal.onclick = () => {
+        if (modal.parentNode) {
+          modal.parentNode.removeChild(modal);
+        }
+      };
       
       const img = document.createElement('img');
       img.src = imageUrl;
@@ -543,7 +547,12 @@
         font-size: 24px; cursor: pointer; color: #333;
         display: flex; align-items: center; justify-content: center;
       `;
-      closeBtn.onclick = () => document.body.removeChild(modal);
+      closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (modal.parentNode) {
+          modal.parentNode.removeChild(modal);
+        }
+      };
       
       modal.appendChild(img);
       modal.appendChild(closeBtn);
