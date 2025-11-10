@@ -191,10 +191,35 @@ npm run admin:hash -- "강력한비밀번호!"
 ---
 배포/운영 중 궁금한 점이 있으면 언제든 질문해주세요. Vercel 외의 인프라(AWS Lambda, Render 등)로 옮길 때도 동일한 구조를 응용할 수 있습니다.
 
-cd C:\Users\82104\bangguy
-   npm run dev
-   http://localhost:3000
-   http://localhost:3000/index.html
-   http://localhost:3000/admin.html
+## 로컬 백업 (Blob 파일 다운로드)
+
+업로드된 사진(WebP)과 동의 로그 JSON 파일은 Vercel Blob에 저장됩니다. 로컬에 백업하려면 아래 절차를 따라주세요.
+
+1. **Vercel CLI 설치 및 로그인**
+   ```bash
+   npm install -g vercel
+   vercel login
+   vercel link
+   ```
+
+2. **Read/Write 토큰 설정**
+   Vercel 프로젝트 > Storage > Blob > Access Tokens에서 토큰을 발급한 뒤, 세션 환경 변수로 설정합니다.
+   ```powershell
+   $env:BLOB_READ_WRITE_TOKEN = "발급받은-토큰"
+   ```
+   (Windows CMD에서는 `set BLOB_READ_WRITE_TOKEN=...`)
+
+3. **백업 스크립트 실행**
+   프로젝트 루트에서 제공되는 `scripts/download-blobs.mjs`를 사용하면 prefix별로 파일을 내려받을 수 있습니다.
+   ```bash
+   node scripts/download-blobs.mjs --prefix attendance/ --output backups/attendance
+   node scripts/download-blobs.mjs --prefix consents/ --output backups/consents --overwrite
+   ```
+   - `--prefix`: Blob 경로 prefix (예: `attendance/`, `consents/`)
+   - `--output`: 로컬 저장 경로 (자동으로 폴더 생성)
+   - `--overwrite`: 이미 존재하는 파일을 덮어쓸 때 사용(옵션)
+
+4. **검증**
+   실행 후 `backups/<prefix>` 폴더에 Blob 파일이 저장됩니다. CSV와 함께 주기적으로 백업하면 월초 정리 전에 데이터를 안전하게 보관할 수 있습니다.
 
    
