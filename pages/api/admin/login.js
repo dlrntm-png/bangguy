@@ -1,6 +1,9 @@
 import { issueAdminToken } from '../../../lib/adminAuth';
 import { getAdminPasswordHash } from '../../../lib/db';
-import { verifyPasswordHash } from '../../../lib/password';
+import {
+  DEFAULT_ADMIN_PASSWORD_HASH,
+  verifyPasswordHash
+} from '../../../lib/password';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -21,7 +24,9 @@ export default async function handler(req, res) {
 
   try {
     const record = await getAdminPasswordHash();
-    const envHash = (process.env.ADMIN_PASSWORD_HASH || '').trim() || null;
+    const envHash =
+      (process.env.ADMIN_PASSWORD_HASH || DEFAULT_ADMIN_PASSWORD_HASH || '').trim() ||
+      null;
     const storedHash = record?.password_hash || envHash;
 
     if (storedHash) {

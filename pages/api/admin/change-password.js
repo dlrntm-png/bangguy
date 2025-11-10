@@ -1,6 +1,10 @@
 import { verifyAdminToken } from '../../../lib/adminAuth';
 import { getAdminPasswordHash, setAdminPasswordHash } from '../../../lib/db';
-import { createPasswordHash, verifyPasswordHash } from '../../../lib/password';
+import {
+  DEFAULT_ADMIN_PASSWORD_HASH,
+  createPasswordHash,
+  verifyPasswordHash
+} from '../../../lib/password';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -41,7 +45,9 @@ export default async function handler(req, res) {
 
   try {
     const record = await getAdminPasswordHash();
-    const envHash = (process.env.ADMIN_PASSWORD_HASH || '').trim() || null;
+    const envHash =
+      (process.env.ADMIN_PASSWORD_HASH || DEFAULT_ADMIN_PASSWORD_HASH || '').trim() ||
+      null;
     const storedHash = record?.password_hash || envHash;
 
     if (!storedHash && !fallbackPassword) {

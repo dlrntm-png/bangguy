@@ -43,7 +43,7 @@
 | --- | --- |
 | `OFFICE_IPS` | 허용할 공인 IP 또는 CIDR 목록 (예: `121.181.222.0/24,121.181.223.0/24`)
 | `ADMIN_PASSWORD` | 관리자 로그인용 비밀번호 (예: `superSecret123!`)
-| `ADMIN_PASSWORD_HASH` | `npm run admin:hash -- "비밀번호"` 명령으로 생성한 PBKDF2 해시. 설정되면 평문 `ADMIN_PASSWORD` 대신 사용됨
+| `ADMIN_PASSWORD_HASH` | `npm run admin:hash -- "비밀번호"` 명령으로 생성한 PBKDF2 해시. 설정되면 평문 `ADMIN_PASSWORD` 대신 사용됨 (미설정 시 기본 해시가 사용됨)
 | `ADMIN_JWT_SECRET` | 관리자 JWT 서명용 시크릿 문자열 (임의의 긴 문자열, 로컬 Mock 모드에서는 미설정 시 기본 시크릿 사용)
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 프로젝트에서 발급한 Read/Write 토큰 |
 | `POSTGRES_URL` | Supabase Postgres 연결 문자열 (`postgres://...`) |
