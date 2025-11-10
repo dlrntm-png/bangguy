@@ -80,16 +80,8 @@
     }
   </style>
   <script>
-    const CONSENT_KEY = 'attendance_privacy_consented';
     let lastFocusedElement = null;
-
-    function hasPrivacyConsent() {
-      return localStorage.getItem(CONSENT_KEY) === 'true';
-    }
-
-    function markPrivacyConsent() {
-      localStorage.setItem(CONSENT_KEY, 'true');
-    }
+    const consentCache = {};
 
     // 기기 고유 ID 생성/조회 함수
     function getDeviceId() {
@@ -222,6 +214,27 @@
       document.getElementById('photoPreview').style.display = 'none';
     }
 
+    async function fetchConsentStatus(employeeId) {
+      if (!employeeId) return { consented: false, ok: true };
+      if (Object.prototype.hasOwnProperty.call(consentCache, employeeId)) {
+        return { ok: true, consented: consentCache[employeeId] };
+      }
+      try {
+        const res = await fetch(`/api/consent/status?employeeId=${encodeURIComponent(employeeId)}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) throw new Error(`status request failed: ${res.status}`);
+        const data = await res.json();
+        if (data.ok && typeof data.consented === 'boolean') {
+          consentCache[employeeId] = data.consented;
+          return { ok: true, consented: data.consented };
+        }
+      } catch (err) {
+        console.warn('Consent status check failed', err);
+      }
+      return { ok: false, consented: false };
+    }
+
     async function submitForm(skipConsentCheck = false) {
       const empId = document.getElementById('empId').value.trim();
       const empName = document.getElementById('empName').value.trim();
@@ -238,9 +251,12 @@
         return; 
       }
 
-      if (!skipConsentCheck && !hasPrivacyConsent()) {
-        openConsentModal();
-        return;
+      if (!skipConsentCheck) {
+        const status = await fetchConsentStatus(empId);
+        if (!status.consented) {
+          openConsentModal();
+          return;
+        }
       }
 
       // 파일 크기 검증 (클라이언트 측)
@@ -363,10 +379,6 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      if (['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) {
-        localStorage.removeItem(CONSENT_KEY);
-      }
-
       loadIpStatus();
       document.getElementById('submitBtn').addEventListener('click', () => submitForm());
       document.getElementById('requestDeviceBtn').addEventListener('click', requestDeviceUpdate);
@@ -405,7 +417,7 @@
               console.warn('동의 로그 저장 중 문제 발생:', err);
             });
           }
-          markPrivacyConsent();
+          consentCache[empId] = true;
           closeConsentModal();
           submitForm(true);
         });
