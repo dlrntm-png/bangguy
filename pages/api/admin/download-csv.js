@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     const rows = await getAllRecordsRaw();
     const csv = buildCsv(rows, [
-      { header: 'server_time', value: (row) => toISOString(row.server_time) },
+      { header: 'server_time', value: (row) => formatKst(row.server_time) },
       { key: 'employee_id' },
       { key: 'name' },
       { key: 'ip' },
@@ -25,10 +25,10 @@ export default async function handler(req, res) {
       { header: 'office', value: (row) => (row.office ? 'true' : 'false') },
       { key: 'device_id' },
       { key: 'image_hash' },
-      { key: 'cleanup_scheduled_at' },
-      { key: 'photo_deleted_at' },
+      { header: 'cleanup_scheduled_at', value: (row) => formatKst(row.cleanup_scheduled_at) },
+      { header: 'photo_deleted_at', value: (row) => formatKst(row.photo_deleted_at) },
       { key: 'backup_blob_path' },
-      { key: 'backup_generated_at' }
+      { header: 'backup_generated_at', value: (row) => formatKst(row.backup_generated_at) }
     ]);
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -40,12 +40,18 @@ export default async function handler(req, res) {
   }
 }
 
-function toISOString(value) {
+function formatKst(value) {
   if (!value) return '';
   try {
     const date = new Date(value);
-    return date.toISOString();
+    if (Number.isNaN(date.getTime())) return String(value);
+    const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return [
+      `${kst.getFullYear()}-${pad(kst.getMonth() + 1)}-${pad(kst.getDate())}`,
+      `${pad(kst.getHours())}:${pad(kst.getMinutes())}:${pad(kst.getSeconds())}`
+    ].join(' ');
   } catch {
-    return value;
+    return String(value);
   }
 }
