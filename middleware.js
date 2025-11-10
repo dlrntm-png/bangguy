@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 
+const BLOB_DOMAINS = [
+  'https://*.vercel-storage.com',
+  'https://*.blob.vercel-storage.com',
+  'https://*.public.blob.vercel-storage.com'
+];
+
 const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
   'X-Frame-Options': 'DENY',
@@ -10,10 +16,10 @@ const SECURITY_HEADERS = {
   'Content-Security-Policy': [
     "default-src 'self'",
     "base-uri 'self'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob: ${BLOB_DOMAINS.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
     "script-src 'self' 'unsafe-inline'",
-    "connect-src 'self'",
+    `connect-src 'self' ${BLOB_DOMAINS.join(' ')}`,
     "font-src 'self'",
     "frame-ancestors 'none'"
   ].join('; ')
