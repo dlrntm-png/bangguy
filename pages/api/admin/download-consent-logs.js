@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     }
 
     const csv = buildCsv(logs, [
-      { key: 'consentedAt', header: 'consented_at' },
+      { header: 'consented_at', value: (row) => formatKst(row.consentedAt) },
       { key: 'employeeId', header: 'employee_id' },
       { key: 'name' },
       { key: 'deviceId', header: 'device_id' },
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       { key: 'userAgent', header: 'user_agent' },
       { key: 'blobPath', header: 'blob_path' },
       { key: 'blobSize', header: 'blob_size' },
-      { key: 'uploadedAt', header: 'uploaded_at' }
+      { header: 'uploaded_at', value: (row) => formatKst(row.uploadedAt) }
     ]);
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -36,6 +36,19 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('[admin] download consent logs error:', err);
     return res.status(500).json({ ok: false, message: '동의 로그 다운로드에 실패했습니다.' });
+  }
+}
+
+function formatKst(value) {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${kst.getFullYear()}-${pad(kst.getMonth() + 1)}-${pad(kst.getDate())} ${pad(kst.getHours())}:${pad(kst.getMinutes())}:${pad(kst.getSeconds())}`;
+  } catch {
+    return String(value);
   }
 }
 
