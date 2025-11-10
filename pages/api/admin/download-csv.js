@@ -1,5 +1,6 @@
 import { verifyAdminToken } from '../../../lib/adminAuth';
 import { getAllRecordsRaw } from '../../../lib/db';
+import { buildCsv } from '../../../lib/csv';
 
 export default async function handler(req, res) {
   try {
@@ -10,21 +11,25 @@ export default async function handler(req, res) {
 
   try {
     const rows = await getAllRecordsRaw();
-    const header = 'server_time,employee_id,name,ip,photo_url,office,device_id,image_hash\n';
-    const body = rows
-      .map(row => [
-        row.server_time?.toISOString?.() || row.server_time,
-        safeCsv(row.employee_id),
-        safeCsv(row.name),
-        safeCsv(row.ip),
-        safeCsv(row.photo_url || ''),
-        row.office ? 'true' : 'false',
-        safeCsv(row.device_id || ''),
-        safeCsv(row.image_hash || '')
-      ].join(','))
-      .join('\n');
-
-    const csv = header + body;
+    const csv = buildCsv(rows, [
+      { header: 'server_time', value: (row) => toISOString(row.server_time) },
+      { key: 'employee_id' },
+      { key: 'name' },
+      { key: 'ip' },
+      { key: 'photo_url' },
+      { key: 'photo_blob_path' },
+      { key: 'photo_content_type' },
+      { key: 'photo_size' },
+      { key: 'photo_width' },
+      { key: 'photo_height' },
+      { header: 'office', value: (row) => (row.office ? 'true' : 'false') },
+      { key: 'device_id' },
+      { key: 'image_hash' },
+      { key: 'cleanup_scheduled_at' },
+      { key: 'photo_deleted_at' },
+      { key: 'backup_blob_path' },
+      { key: 'backup_generated_at' }
+    ]);
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="attendance_${new Date().toISOString().split('T')[0]}.csv"`);
@@ -35,11 +40,12 @@ export default async function handler(req, res) {
   }
 }
 
-function safeCsv(value) {
-  if (value == null) return '';
-  const str = String(value).replace(/\r|\n/g, ' ');
-  if (str.includes(',') || str.includes('"')) {
-    return '"' + str.replace(/"/g, '""') + '"';
+function toISOString(value) {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    return date.toISOString();
+  } catch {
+    return value;
   }
-  return str;
 }

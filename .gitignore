@@ -16,6 +16,7 @@ yarn-error.log*
 
 # Uploaded files
 server/uploads/
+public/mock-uploads/
 *.jpg
 *.jpeg
 *.png

@@ -32,8 +32,16 @@
     .status-approved { background: #d4edda; color: #155724; }
     .status-rejected { background: #f8d7da; color: #721c24; }
     .loading { opacity: 0.6; pointer-events: none; }
-    .photo-preview { max-width: 100px; max-height: 100px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
+    .photo-preview { max-width: 90px; max-height: 90px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: block; }
     .photo-preview:hover { transform: scale(1.05); }
+    .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+    .name-cell { max-width: 120px; }
+    @media (max-width: 600px) {
+      table { font-size: 12px; }
+      th, td { padding: 8px 6px; }
+      .photo-preview { max-width: 70px; max-height: 70px; }
+      .truncate { max-width: 80px; }
+    }
   </style>
 </head>
 <body>
@@ -117,6 +125,7 @@
         <input type="text" id="searchEmpId" placeholder="사번 (전체 조회는 비워두세요)" />
         <button class="primary" onclick="loadRecords()">조회</button>
         <button onclick="downloadCSV()">CSV 다운로드</button>
+        <button onclick="downloadConsentLogs()">동의 로그 다운로드</button>
       </div>
       <div id="recordActions" style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
         <label style="display: flex; align-items: center; gap: 6px;">
@@ -445,38 +454,57 @@
         }
       };
 
-      let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>IP</th><th>기기 ID</th><th>사내망</th><th>사진</th><th>작업</th></tr></thead><tbody>';
+      const formatSize = (bytes) => {
+        if (!bytes) return '-';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let value = Number(bytes);
+        let unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+          value /= 1024;
+          unitIndex += 1;
+        }
+        return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[unitIndex]}`;
+      };
+
+      let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>사진</th><th>상태</th><th>작업</th></tr></thead><tbody>';
       records.forEach(record => {
         const imageUrl = record.file || '';
         const hasImage = Boolean(imageUrl);
-        let displayFile = '-';
-        if (imageUrl) {
-          try {
-            const parts = imageUrl.split('/');
-            displayFile = decodeURIComponent(parts[parts.length - 1] || imageUrl).slice(-100);
-          } catch {
-            displayFile = imageUrl.slice(-100);
-          }
-        }
-        
+        const sizeLabel = record.photo_size ? formatSize(record.photo_size) : '-';
+        const resolutionLabel = record.photo_width && record.photo_height
+          ? `${record.photo_width}×${record.photo_height}`
+          : '-';
+        const cleanupTime = record.photo_deleted_at
+          ? `삭제: ${formatTime(record.photo_deleted_at)}`
+          : record.cleanup_scheduled_at
+            ? `예정: ${formatTime(record.cleanup_scheduled_at)}`
+            : '보관 중';
+        const statusBadge = record.photo_deleted_at
+          ? '<span class="status-badge status-rejected">삭제됨</span>'
+          : record.cleanup_scheduled_at
+            ? '<span class="status-badge status-pending">삭제 예정</span>'
+            : '<span class="status-badge status-approved">보관 중</span>';
         html += `<tr>
           <td><input type="checkbox" class="record-checkbox" data-id="${record.recordId}" onchange="toggleRecordSelection(this)" /></td>
           <td>${formatTime(record.server_time)}</td>
           <td><strong>${record.employee_id || '-'}</strong></td>
-          <td>${record.name || '-'}</td>
-          <td style="font-family: monospace;">${record.ip || '-'}</td>
-          <td style="font-size: 0.85em; word-break: break-all; max-width: 200px;">${record.device_id || '-'}</td>
-          <td>${record.office ? '<span style="color: green;">✅</span>' : '<span style="color: red;">❌</span>'}</td>
+          <td><span class="truncate name-cell" title="${(record.name || '-').replace(/"/g, '&quot;')}">${record.name || '-'}</span></td>
           <td>
             ${hasImage ? `
               <div style="position: relative; display: inline-block;">
-                <img src="${imageUrl}" 
-                     alt="미리보기" 
+                <img src="${imageUrl}"
+                     alt="미리보기"
                      class="photo-preview"
-                     onclick="showImageModal('${imageUrl}', '${displayFile.replace(/'/g, "\\'")}')" />
-                <div style="margin-top: 4px; font-size: 0.85em; color: #666; max-width: 180px; word-break: break-all;">${displayFile}</div>
+                     onclick="showImageModal('${imageUrl}', '사진 미리보기')" />
+                <div style="margin-top: 4px; font-size: 0.75em; color: #666;">
+                  ${sizeLabel} · ${resolutionLabel}
+                </div>
               </div>
             ` : '<span style="color: #999;">-</span>'}
+          </td>
+          <td>
+            ${statusBadge}<br />
+            <span style="font-size: 12px; color: #666;">${cleanupTime}</span>
           </td>
           <td>
             ${hasImage ? `
@@ -608,6 +636,33 @@
         }
       } catch (e) {
         alert('CSV 다운로드 중 오류가 발생했습니다.');
+      }
+    }
+
+    async function downloadConsentLogs() {
+      try {
+        const res = await fetch('/api/admin/download-consent-logs', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `consent_logs_${new Date().toISOString().split('T')[0]}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        } else if (res.status === 204) {
+          alert('저장된 동의 로그가 없습니다.');
+        } else {
+          const data = await res.json().catch(() => ({}));
+          alert('동의 로그 다운로드 실패: ' + (data.message || '알 수 없는 오류'));
+        }
+      } catch (e) {
+        alert('동의 로그 다운로드 중 오류가 발생했습니다.');
+        console.error('download consent logs error:', e);
       }
     }
 

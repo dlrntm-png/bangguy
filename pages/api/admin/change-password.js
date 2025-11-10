@@ -33,11 +33,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, message: '새 비밀번호가 서로 일치하지 않습니다.' });
   }
 
-  const fallbackPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const isDevMode = process.env.NODE_ENV !== 'production';
+  const allowFallback =
+    isDevMode && process.env.ALLOW_DEV_ADMIN_PASSWORD !== 'false';
+  const fallbackPassword =
+    allowFallback && (process.env.ADMIN_PASSWORD || 'admin123');
 
   try {
     const record = await getAdminPasswordHash();
     const storedHash = record?.password_hash || null;
+
+    if (!storedHash && !fallbackPassword) {
+      return res.status(503).json({
+        ok: false,
+        message:
+          '관리자 비밀번호가 아직 설정되지 않았습니다. 먼저 ADMIN_PASSWORD_HASH 값을 환경 변수로 설정한 후 다시 시도하세요.'
+      });
+    }
 
     const matchesCurrent = storedHash
       ? verifyPasswordHash(currentPassword, storedHash)
@@ -51,7 +63,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, message: '현재 비밀번호와 다른 비밀번호를 사용해주세요.' });
     }
 
-    if (!storedHash && newPassword === fallbackPassword) {
+    if (!storedHash && fallbackPassword && newPassword === fallbackPassword) {
       return res.status(400).json({ ok: false, message: '현재 비밀번호와 다른 비밀번호를 사용해주세요.' });
     }
 

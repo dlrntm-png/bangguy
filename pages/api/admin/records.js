@@ -20,9 +20,17 @@ export default async function handler(req, res) {
       ip: row.ip,
       file: row.photo_url,
       photo_blob_path: row.photo_blob_path,
+       photo_content_type: row.photo_content_type,
+       photo_size: row.photo_size,
+       photo_width: row.photo_width,
+       photo_height: row.photo_height,
       office: row.office,
       device_id: row.device_id,
-      image_hash: row.image_hash
+      image_hash: row.image_hash,
+      cleanup_scheduled_at: row.cleanup_scheduled_at,
+      photo_deleted_at: row.photo_deleted_at,
+      backup_blob_path: row.backup_blob_path,
+      backup_generated_at: row.backup_generated_at
     }));
 
     return res.status(200).json({ ok: true, records: mapped });

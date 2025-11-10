@@ -1,4 +1,32 @@
-#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+
+function run(command, args) {
+  const result = spawnSync(command, args, { stdio: 'inherit', shell: false });
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+const message =
+  process.argv.slice(2).join(' ').trim() ||
+  `auto: ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`;
+
+run('git', ['add', '-A']);
+
+const commitResult = spawnSync('git', ['commit', '-m', message], {
+  stdio: 'inherit',
+  shell: false
+});
+
+if (commitResult.status !== 0) {
+  if (commitResult.status === 1) {
+    console.log('ℹ️  커밋할 변경 사항이 없습니다.');
+    process.exit(0);
+  }
+  process.exit(commitResult.status ?? 1);
+}
+
+console.log(`✅ 커밋 완료: ${message}`);
 /**
  * 자동 커밋 스크립트
  * 변경사항이 있을 때 자동으로 커밋합니다.

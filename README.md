@@ -15,6 +15,8 @@
   - 사진 미리보기 및 삭제
   - 선택/전체 기록 삭제 (연결된 사진 Blob도 함께 제거)
 - **자동 파일 관리**: 업로드 이미지는 Vercel Blob에 저장되며, 레코드 삭제 시 Blob도 함께 제거
+- **이미지 최적화**: 업로드 이미지는 자동으로 WebP로 압축(기본 1280px, 80% 품질)되며 크기/해상도 메타데이터를 함께 저장
+- **월별 정리 자동화**: 매월 1일 이전에 백업 알림 메일 발송, CSV 백업 생성 후 자동으로 사진 파일 정리
 
 ## 기술 스택
 - **Frontend**: 정적 HTML (`public/index.html`, `public/admin.html`)
@@ -41,7 +43,8 @@
 | --- | --- |
 | `OFFICE_IPS` | 허용할 공인 IP 또는 CIDR 목록 (예: `121.181.222.0/24,121.181.223.0/24`)
 | `ADMIN_PASSWORD` | 관리자 로그인용 비밀번호 (예: `superSecret123!`)
-| `ADMIN_JWT_SECRET` | 관리자 JWT 서명용 시크릿 문자열 (임의의 긴 문자열)
+| `ADMIN_PASSWORD_HASH` | `npm run admin:hash -- "비밀번호"` 명령으로 생성한 PBKDF2 해시. 설정되면 평문 `ADMIN_PASSWORD` 대신 사용됨
+| `ADMIN_JWT_SECRET` | 관리자 JWT 서명용 시크릿 문자열 (임의의 긴 문자열, 로컬 Mock 모드에서는 미설정 시 기본 시크릿 사용)
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 프로젝트에서 발급한 Read/Write 토큰 |
 | `POSTGRES_URL` | Supabase Postgres 연결 문자열 (`postgres://...`) |
 | `POSTGRES_SSL` | (선택) `disable` 또는 `require` 등 SSL 모드 지정, 기본값 `require` |
@@ -50,6 +53,16 @@
 | `SUPABASE_DB_USER` | (선택) DB 사용자명, 기본값 `postgres` |
 | `SUPABASE_DB_NAME` | (선택) DB 이름, 기본값 `postgres` |
 | `SUPABASE_DB_PORT` | (선택) DB 포트, 기본값 `5432` |
+| `UPLOAD_MAX_WIDTH` | (선택) 업로드 이미지 최대 가로폭(px). 기본 1280 |
+| `UPLOAD_WEBP_QUALITY` | (선택) WebP 품질(1~100). 기본 80 |
+| `MOCK_DB` | (선택) `true` 로 설정하면 로컬에서 메모리 DB를 사용 (재시작 시 초기화) |
+| `MOCK_BLOB` | (선택) `true` 로 설정하면 Vercel Blob 대신 `public/mock-uploads/`에 파일을 저장 |
+| `RESEND_API_KEY` | (선택) Resend 이메일 API 키. 월별 정리 알림에 사용 |
+| `RESEND_FROM_EMAIL` | (선택) 발신자 이메일 주소. 기본값 `noreply@attendance.local` |
+| `CLEANUP_NOTIFY_EMAILS` | (선택) 월별 백업 알림을 받을 이메일 목록 (콤마 구분) |
+| `CLEANUP_SECRET` | 월별 정리 API를 호출할 때 사용하는 보안 토큰 (Vercel Cron에서 사용) |
+| `BLOB_PUBLIC_BASE_URL` | (선택) Blob 다운로드용 커스텀 도메인이 있을 때 설정 |
+| `ALLOW_DEV_ADMIN_PASSWORD` | (선택) `false`로 설정하면 개발 환경에서도 기본 관리자 비밀번호 사용을 차단 |
 
 > **로컬 개발 시** `.env.local` 에 Supabase Connection string을 그대로 넣으면 동일하게 동작합니다.
 
@@ -59,10 +72,34 @@ npm install
 npm run dev
 ```
 
+### 빠른 커밋 자동화
+작업 요청마다 빠르게 커밋하려면 다음 스크립트를 사용하세요.
+
+```bash
+npm run commit -- "작업 메시지"
+```
+
+- 메시지를 생략하면 `auto: YYYY-MM-DD HH:mm:ss` 형식으로 자동 작성됩니다.
+- 변경 사항이 없으면 “커밋할 변경 사항이 없습니다.” 메시지만 출력됩니다.
+- Push는 자동으로 실행되지 않으니 필요할 때 `git push`로 올려주세요.
+
+### 관리자 비밀번호 해시 생성
+프로덕션에서는 평문 비밀번호 대신 해시를 사용하세요.
+
+```bash
+npm run admin:hash -- "강력한비밀번호!"
+```
+
+- 출력된 문자열을 `ADMIN_PASSWORD_HASH` 환경 변수로 설정합니다.
+- 개발 환경에서만 `ADMIN_PASSWORD`(또는 기본값 `admin123`)이 허용됩니다. 배포 환경에서는 해시가 없으면 로그인할 수 없습니다.
+
 - 개발 서버: `http://localhost:3000`
 - 사용자 페이지: `/` → 현재 IP/사내망 여부 + 출퇴근 등록
 - 관리자 페이지: `/admin.html`
 - API 로그는 터미널(서버리스 함수 실행 시 콘솔)에서 확인
+- 로컬에서 빠르게 확인하려면 `.env.local` 에 `MOCK_DB=true`, `MOCK_BLOB=true`, `OFFICE_IPS=175.120.139.0/24,127.0.0.1/32,::1/128` 를 지정하세요.  
+  - Mock DB는 메모리에 데이터를 저장하며 서버 재시작 시 초기화됩니다.  
+  - Mock Blob은 `public/mock-uploads/` 폴더에 WebP/CSV 파일을 저장하며 `.gitignore`에 포함되어 있어 Git에 커밋되지 않습니다.
 
 ## Vercel 배포 절차
 1. **Repository 연결**: `dlrntm-png/bangguy` 저장소를 Vercel 프로젝트에 연결합니다.
@@ -115,7 +152,19 @@ npm run dev
 - **Blob 용량 관리**: 불필요한 기록을 주기적으로 정리하여 저장 공간 절약
 - **Postgres 백업**: Supabase는 PITR/백업 기능을 제공하므로 콘솔에서 주기적으로 백업 설정을 확인
 - **보안**: `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`은 강력한 값으로 설정하고 주기적으로 교체
+- **HTTPS & 보안 헤더**: `middleware.js`를 통해 HSTS, CSP, X-Frame-Options, Referrer-Policy 등을 모든 관리자/API 응답에 적용
+- **관리자 비밀번호**: `ADMIN_PASSWORD_HASH` 설정을 권장하고, 필요 시 `ALLOW_DEV_ADMIN_PASSWORD=false`로 기본 비밀번호를 비활성화
 - **IP 화이트리스트**: 사내 IP 대역 변경 시 `OFFICE_IPS` 환경 변수를 업데이트 후 재배포
+- **월별 백업 & 자동 삭제**
+  - Vercel Blob에 `backups/<YYYY-MM>/…` 경로로 CSV 메타데이터 자동 생성
+  - `/api/admin/cleanup-preview` (POST): 전월 데이터 통계 + CSV 업로드 + 알림 메일 발송  
+    - 관리자 토큰 또는 `x-cron-secret: CLEANUP_SECRET` 헤더로 호출 가능  
+    - Vercel Scheduled Functions로 매월 **말일 09:00 KST** 정도에 호출하면 알림 메일이 발송됩니다.
+  - `/api/admin/cleanup-execute` (POST): 전월 사진 파일 삭제 및 메타데이터 정리  
+    - 매월 **1일 00:10 KST** 등으로 예약 실행  
+    - 삭제 후 기록은 유지되지만 `photo_url`이 제거되고 `photo_deleted_at` 타임스탬프가 남습니다.
+  - 알림 메일을 받으려면 `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `CLEANUP_NOTIFY_EMAILS` 환경 변수를 설정하세요.
+  - CSV 파일에는 사진 URL/Blob 경로가 포함되므로, 삭제 전에 다운로드하여 로컬 NAS/백업 디스크에 보관할 수 있습니다.
 
 ## Supabase 설정 요약
 1. [Supabase](https://supabase.com) 프로젝트를 생성합니다.
@@ -141,3 +190,11 @@ npm run dev
 
 ---
 배포/운영 중 궁금한 점이 있으면 언제든 질문해주세요. Vercel 외의 인프라(AWS Lambda, Render 등)로 옮길 때도 동일한 구조를 응용할 수 있습니다.
+
+cd C:\Users\82104\bangguy
+   npm run dev
+   http://localhost:3000
+   http://localhost:3000/index.html
+   http://localhost:3000/admin.html
+
+   

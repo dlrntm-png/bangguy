@@ -1,7 +1,7 @@
 import formidable from 'formidable';
 import fs from 'fs/promises';
 import { getClientIp, isOfficeIp } from '../../../lib/ip';
-import { getKoreaISOString } from '../../../lib/time';
+import { getKoreaISOString, getNextMonthStartKstISO } from '../../../lib/time';
 import { md5 } from '../../../lib/hash';
 import {
   getLastRecordByEmployee,
@@ -9,6 +9,7 @@ import {
   insertAttendanceRecord
 } from '../../../lib/db';
 import { uploadPhotoBuffer } from '../../../lib/blob';
+import { compressImage } from '../../../lib/image';
 
 export const config = {
   api: {
@@ -95,8 +96,8 @@ export default async function handler(req, res) {
       });
     }
 
-    const buffer = await fs.readFile(actualPhoto.filepath);
-    const imageHash = md5(buffer);
+    const originalBuffer = await fs.readFile(actualPhoto.filepath);
+    const imageHash = md5(originalBuffer);
 
     if (!office) {
       await safeRemoveTemp(actualPhoto.filepath);
@@ -156,9 +157,23 @@ export default async function handler(req, res) {
       });
     }
 
-    const uploadResult = await uploadPhotoBuffer(buffer, actualPhoto.originalFilename || 'photo.jpg', actualPhoto.mimetype);
+    const { buffer: compressedBuffer, info: compressedInfo } = await compressImage(originalBuffer);
+
+    const uploadResult = await uploadPhotoBuffer(
+      compressedBuffer,
+      actualPhoto.originalFilename || 'photo.jpg',
+      compressedInfo.contentType,
+      {
+        forceExtension: '.webp',
+        fallbackContentType: compressedInfo.contentType,
+        prefix: 'attendance',
+        cacheControl: 'public, max-age=31536000, immutable'
+      }
+    );
 
     await safeRemoveTemp(actualPhoto.filepath);
+
+    const cleanupScheduledAt = getNextMonthStartKstISO(serverTime);
 
     const record = await insertAttendanceRecord({
       serverTime,
@@ -167,9 +182,14 @@ export default async function handler(req, res) {
       ip,
       photoUrl: uploadResult.url,
       photoBlobPath: uploadResult.pathname,
+      photoContentType: compressedInfo.contentType,
+      photoSize: compressedInfo.size,
+      photoWidth: compressedInfo.width,
+      photoHeight: compressedInfo.height,
       office,
       deviceId,
-      imageHash
+      imageHash,
+      cleanupScheduledAt
     });
 
     return res.status(200).json({
