@@ -39,7 +39,7 @@
     .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .section-header h3 { margin: 0; }
     .section-header-actions { display: flex; gap: 8px; font-size: 13px; }
-    .section-header-actions button { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+    .section-header-actions button { padding: 6px 10px; font-size: 12px; white-space: nowrap; min-width: 120px; cursor: pointer; }
     .records-table table { width: 100%; border-collapse: collapse; }
     .records-table td { vertical-align: middle; }
     .status-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -88,10 +88,10 @@
       .records-table td.status-cell { grid-area: status; margin-top: 6px; }
       .photo-preview { max-width: 72px; max-height: 72px; }
       .photo-meta { display: none; }
-      .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .section-header { flex-direction: row; align-items: center; }
       .section-header h3 { font-size: 18px; }
-      .section-header-actions { width: 100%; justify-content: space-between; gap: 6px; font-size: 12px; }
-      .section-header-actions button { flex: 1 1 48%; padding: 6px 8px; font-size: 11px; }
+      .section-header-actions { gap: 6px; font-size: 11px; }
+      .section-header-actions button { padding: 6px 8px; font-size: 11px; min-width: 0; }
       .status-wrapper { gap: 4px; }
       .record-filter-row { flex-direction: column; align-items: stretch; }
       .filter-group { width: 100%; }
@@ -126,8 +126,8 @@
       <div class="section-header">
         <h3>등록 기록 조회</h3>
         <div class="section-header-actions">
-          <button onclick="downloadCSV()">CSV 다운로드</button>
-          <button onclick="downloadConsentLogs()">동의 로그 다운로드</button>
+          <button onclick="confirmDownload('csv')">CSV 다운로드</button>
+          <button onclick="confirmDownload('consent')">동의 로그 다운로드</button>
         </div>
       </div>
       <div class="record-filter-row">
@@ -202,6 +202,18 @@
     let adminToken = localStorage.getItem('admin_token');
     let cachedRecords = [];
     const selectedRecordIds = new Set();
+
+    function confirmDownload(type) {
+      if (type === 'csv') {
+        if (confirm('CSV 파일을 다운로드할까요?')) {
+          downloadCSV();
+        }
+      } else if (type === 'consent') {
+        if (confirm('동의 로그 파일을 다운로드할까요?')) {
+          downloadConsentLogs();
+        }
+      }
+    }
 
     function setRecordsPlaceholder(message) {
       const tableDiv = document.getElementById('recordsTable');
