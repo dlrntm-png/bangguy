@@ -37,20 +37,49 @@
     .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
     .name-cell { max-width: 120px; }
     .records-table table { width: 100%; border-collapse: collapse; }
-    .status-label { display: inline-block; margin-bottom: 4px; }
+    .records-table td { vertical-align: middle; }
+    .status-wrapper { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .status-meta { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666; }
+    .status-time { font-size: 12px; color: #666; }
     .action-button { padding: 6px 12px; font-size: 12px; }
     @media (max-width: 600px) {
-      table { font-size: 12px; table-layout: fixed; }
-      th, td { padding: 6px 4px; }
-      th:nth-child(1) { width: 40px; }
-      th:nth-child(2) { width: 105px; }
-      th:nth-child(3) { width: 70px; }
-      th:nth-child(4) { width: 70px; }
-      th:nth-child(5), th:nth-child(6) { width: auto; }
-      .photo-preview { max-width: 60px; max-height: 60px; }
+      .records-table thead { display: none; }
+      .records-table table { border-collapse: separate; border-spacing: 0 12px; }
+      .records-table tbody { display: block; }
+      .records-table tr {
+        display: grid;
+        grid-template-columns: 32px 1fr 88px;
+        grid-template-areas:
+          "select time photo"
+          "select emp photo"
+          "select name photo"
+          "select status photo";
+        gap: 4px 12px;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+      }
+      .records-table td {
+        border: none;
+        padding: 0;
+        font-size: 13px;
+      }
+      .records-table td.select-cell { grid-area: select; padding-top: 4px; }
+      .records-table td.time-cell { grid-area: time; font-weight: 600; }
+      .records-table td.emp-cell { grid-area: emp; }
+      .records-table td.name-cell { grid-area: name; }
+      .records-table td.photo-cell { grid-area: photo; text-align: center; }
+      .records-table td.status-cell { grid-area: status; margin-top: 6px; }
+      .photo-preview { max-width: 72px; max-height: 72px; }
       .photo-meta { display: none; }
-      .action-button { padding: 4px 8px; font-size: 11px; margin-top: 4px; }
-      .status-label { display: block; margin-bottom: 4px; }
+      .status-wrapper {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      .status-actions { display: flex; gap: 8px; width: 100%; }
+      .status-actions .action-button { width: auto; padding: 6px 10px; font-size: 12px; }
     }
   </style>
 </head>
@@ -389,29 +418,39 @@
             ? '<span class="status-badge status-pending">삭제 예정</span>'
             : '<span class="status-badge status-approved">보관 중</span>';
         html += `<tr>
-          <td><input type="checkbox" class="record-checkbox" data-id="${record.recordId}" onchange="toggleRecordSelection(this)" /></td>
-          <td>${formatTime(record.server_time)}</td>
-          <td><strong>${record.employee_id || '-'}</strong></td>
-          <td><span class="truncate name-cell" title="${(record.name || '-').replace(/"/g, '&quot;')}">${record.name || '-'}</span></td>
-          <td>
+          <td class="select-cell">
+            <input type="checkbox" class="record-checkbox" data-id="${record.recordId}" onchange="toggleRecordSelection(this)" />
+          </td>
+          <td class="time-cell">${formatTime(record.server_time)}</td>
+          <td class="emp-cell"><strong>${record.employee_id || '-'}</strong></td>
+          <td class="name-cell">
+            <span class="truncate" title="${(record.name || '-').replace(/"/g, '&quot;')}">${record.name || '-'}</span>
+          </td>
+          <td class="photo-cell">
             ${hasImage ? `
-              <div style="position: relative; display: inline-block;">
+              <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px;">
                 <img src="${imageUrl}"
                      alt="미리보기"
                      class="photo-preview"
                      onclick="showImageModal('${imageUrl}', '사진 미리보기')" />
-                <div class="photo-meta" style="margin-top: 4px; font-size: 0.75em; color: #666;">
+                <div class="photo-meta" style="font-size: 0.75em; color: #666;">
                   ${sizeLabel} · ${resolutionLabel}
                 </div>
               </div>
             ` : '<span style="color: #999;">-</span>'}
           </td>
-          <td>
-            <span class="status-label">${statusBadge}</span>
-            <span style="display: block; font-size: 12px; color: #666;">${cleanupTime}</span>
-            ${hasImage ? `
-              <button class="danger action-button" onclick="deletePhoto(${record.recordId}, '${(record.employee_id || '').replace(/'/g, "\\'")}')">사진 삭제</button>
-            ` : ''}
+          <td class="status-cell">
+            <div class="status-wrapper">
+              <div class="status-meta">
+                ${statusBadge}
+                <span class="status-time">${cleanupTime}</span>
+              </div>
+              ${hasImage ? `
+                <div class="status-actions">
+                  <button class="danger action-button" onclick="deletePhoto(${record.recordId}, '${(record.employee_id || '').replace(/'/g, "\\'")}')">사진 삭제</button>
+                </div>
+              ` : ''}
+            </div>
           </td>
         </tr>`;
       });
