@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/admin/cleanup-preview",
-      "schedule": "0 0 9 * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/admin/cleanup-execute",
-      "schedule": "0 10 0 * * *"
+      "schedule": "10 0 * * *"
     }
   ]
 }
