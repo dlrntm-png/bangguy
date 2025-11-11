@@ -131,11 +131,22 @@
       .period-clear { width: 100%; }
       .filter-period input[type="date"],
       .filter-period input[type="month"] {
-        position: absolute;
-        opacity: 0;
+        pointer-events: none;
+      }
+      .filter-period input.active-picker {
+        position: static;
+        width: 100%;
+        height: 44px;
+        margin-top: 8px;
+        opacity: 1;
         pointer-events: auto;
-        width: 1px;
-        height: 1px;
+        border: 1px solid #c7d2fe;
+        border-radius: 10px;
+        background: #fff;
+        padding: 10px 12px;
+        font-size: 14px;
+        color: #0f172a;
+        box-shadow: inset 0 0 0 1px rgba(99,102,241,0.12);
       }
     }
   </style>
@@ -294,6 +305,9 @@
           if (forceReset) dateFilterInput.value = '';
         }
       }
+
+      dateFilterInput.classList.toggle('active-picker', normalizedMode === 'date');
+      monthFilterInput.classList.toggle('active-picker', normalizedMode === 'month');
 
       currentPeriodMode = normalizedMode;
 
