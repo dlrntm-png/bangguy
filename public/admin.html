@@ -134,20 +134,21 @@
           <button onclick="confirmDownload('consent')">동의 로그 다운로드</button>
         </div>
       </div>
-      <div class="record-filter-row">
-        <div class="filter-group">
-          <label for="searchEmpId">사번으로 검색</label>
-          <input type="text" id="searchEmpId" placeholder="사번 입력" />
+      <div class="filters">
+          <label>
+            사번
+            <input type="text" id="employeeIdFilter" placeholder="사번 입력" />
+          </label>
+          <label>
+            날짜
+            <input type="date" id="dateFilter" />
+          </label>
+          <label>
+            월별
+            <input type="month" id="monthFilter" />
+          </label>
+          <button id="resetFilters" type="button">초기화</button>
         </div>
-        <div class="filter-group">
-          <label for="dateFilter">날짜별 조회</label>
-          <input type="date" id="dateFilter" onchange="onDateFilterChange()" />
-        </div>
-        <div class="filter-group">
-          <label for="monthFilter">월별 조회</label>
-          <input type="month" id="monthFilter" onchange="onMonthFilterChange()" />
-        </div>
-      </div>
       <div class="filter-actions">
         <div class="filter-actions-left">
           <button class="primary" onclick="loadRecords()">조회</button>
