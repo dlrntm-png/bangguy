@@ -48,19 +48,16 @@
     .status-time { font-size: 12px; color: #666; }
     .record-filter-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; align-items: flex-end; }
     .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
-    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-top: 12px; }
-    .filters .filter-group { min-width: 150px; display: flex; flex-direction: column; gap: 6px; }
-    .filters .filter-id { flex: 1 1 200px; }
-    .filters .filter-period { flex: 1 1 280px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin-top: 12px; }
+    .filters .filter-group { min-width: 150px; display: flex; flex-direction: column; gap: 10px; }
+    .filters .filter-id { flex: 1 1 220px; }
+    .filters .filter-period { flex: 1 1 320px; }
     .filters .filter-label { font-weight: 700; color: #1e293b; font-size: 13px; letter-spacing: -0.01em; }
-    .filters .filter-reset { margin: 0; height: 44px; padding: 0 20px; font-weight: 600; align-self: stretch; border-radius: 12px; border: none; background: linear-gradient(145deg, #fce7f3, #fbcfe8); color: #9d174d; cursor: pointer; box-shadow: 0 8px 18px rgba(236, 72, 153, 0.18); transition: transform 0.12s ease, box-shadow 0.12s ease; }
-    .filters .filter-reset:hover { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(236, 72, 153, 0.28); }
-    .filters .filter-reset:focus-visible { outline: 3px solid rgba(244, 63, 94, 0.35); outline-offset: 2px; }
-    .input-card { background: linear-gradient(145deg, #ecfeff, #cffafe); border: 1px solid #bae6fd; border-radius: 12px; padding: 12px 14px; box-shadow: 0 10px 22px rgba(14, 165, 233, 0.12); display: flex; flex-direction: column; gap: 8px; }
+    .input-card { background: linear-gradient(145deg, #ecfeff, #cffafe); border: 1px solid #bae6fd; border-radius: 16px; padding: 18px 20px; box-shadow: 0 10px 22px rgba(14, 165, 233, 0.12); display: flex; flex-direction: column; gap: 10px; }
     .input-card input[type="text"] { width: 100%; padding: 11px 12px; border: 1px solid #bae6fd; border-radius: 10px; background: rgba(255,255,255,0.92); font-size: 14px; font-weight: 500; color: #0f172a; transition: border 0.12s ease, box-shadow 0.12s ease; }
     .input-card input[type="text"]::placeholder { color: #94a3b8; }
     .input-card input[type="text"]:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.2); background: #fff; }
-    .period-card { background: linear-gradient(145deg, #eef2ff, #e2e8ff); border: 1px solid #c7d2fe; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.12); }
+    .period-card { background: linear-gradient(145deg, #eef2ff, #e2e8ff); border: 1px solid #c7d2fe; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.12); }
     .period-status { margin: 0; font-size: 13px; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .period-status span { font-size: 12px; color: #475569; font-weight: 500; }
     .period-status.has-value { color: #0f172a; }
@@ -127,9 +124,8 @@
       .filter-actions-left { width: 100%; gap: 6px; }
       .filter-actions-left button { flex: 1 1 auto; }
       .filter-hint { font-size: 11px; }
-      .filters { gap: 10px; }
+      .filters { gap: 12px; }
       .filters .filter-id, .filters .filter-period { min-width: 0; flex: 1 1 100%; }
-      .filters .filter-reset { width: 100%; height: 46px; }
       .period-buttons { width: 100%; }
       .period-btn { flex: 1 1 calc(50% - 6px); }
       .period-clear { width: 100%; }
@@ -186,7 +182,6 @@
           <input type="date" id="dateFilter" class="hidden" />
           <input type="month" id="monthFilter" class="hidden" />
         </div>
-        <button id="resetFilters" type="button" class="filter-reset">필터 리셋</button>
       </div>
       <div class="filter-actions">
         <div class="filter-actions-left">
