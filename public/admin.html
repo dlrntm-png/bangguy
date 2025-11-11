@@ -48,6 +48,17 @@
     .status-time { font-size: 12px; color: #666; }
     .record-filter-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; align-items: flex-end; }
     .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 12px; }
+    .filters .filter-group { min-width: 150px; }
+    .filters .filter-id { flex: 1 1 160px; }
+    .filters .filter-period { flex: 1 1 220px; }
+    .filters .filter-label { font-weight: 600; color: #333; font-size: 13px; }
+    .filters .filter-reset { margin: 0; height: 40px; padding: 0 18px; font-weight: 600; align-self: flex-end; }
+    .period-toggle { display: inline-flex; background: #e2e8f0; padding: 4px; border-radius: 999px; gap: 4px; width: fit-content; }
+    .period-toggle button { border: none; background: transparent; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .period-toggle button.active { background: #2563eb; color: #fff; box-shadow: 0 8px 16px rgba(37, 99, 235, 0.25); }
+    .period-toggle button:focus-visible { outline: 2px solid rgba(37, 99, 235, 0.45); outline-offset: 2px; }
+    .filter-period input[type="date"], .filter-period input[type="month"] { width: 100%; }
     .filter-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
     .filter-actions-left { display: flex; gap: 8px; }
     .filter-actions button { margin: 0; }
@@ -103,6 +114,10 @@
       .filter-actions-left { width: 100%; gap: 6px; }
       .filter-actions-left button { flex: 1 1 auto; }
       .filter-hint { font-size: 11px; }
+      .filters { gap: 10px; }
+      .filters .filter-id, .filters .filter-period { min-width: 0; flex: 1 1 100%; }
+      .filters .filter-reset { width: 100%; height: 42px; }
+      .period-toggle { width: 100%; justify-content: space-between; }
     }
   </style>
 </head>
@@ -135,27 +150,28 @@
         </div>
       </div>
       <div class="filters">
-          <label>
-            사번
-            <input type="text" id="employeeIdFilter" placeholder="사번 입력" />
-          </label>
-          <label>
-            날짜
-            <input type="date" id="dateFilter" />
-          </label>
-          <label>
-            월별
-            <input type="month" id="monthFilter" />
-          </label>
-          <button id="resetFilters" type="button">초기화</button>
+        <div class="filter-group filter-id">
+          <label class="filter-label" for="searchEmpId">사번</label>
+          <input type="text" id="searchEmpId" placeholder="사번 입력" />
         </div>
+        <div class="filter-group filter-period">
+          <span class="filter-label">기간</span>
+          <div class="period-toggle">
+            <button type="button" data-period-mode="date" class="active">일</button>
+            <button type="button" data-period-mode="month">월</button>
+          </div>
+          <input type="date" id="dateFilter" />
+          <input type="month" id="monthFilter" class="hidden" />
+        </div>
+        <button id="resetFilters" type="button" class="filter-reset">초기화</button>
+      </div>
       <div class="filter-actions">
         <div class="filter-actions-left">
           <button class="primary" onclick="loadRecords()">조회</button>
           <button onclick="resetRecordFilters()">필터 초기화</button>
         </div>
       </div>
-      <p class="filter-hint">사번, 날짜 또는 월을 선택한 후 조회 버튼을 눌러주세요. 날짜와 월은 동시에 선택할 수 없습니다.</p>
+      <p class="filter-hint">사번 또는 기간을 선택한 뒤 조회 버튼을 눌러주세요. 기간은 일 / 월 중 한 가지 방식만 사용됩니다.</p>
       <div id="recordActions" style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
         <label style="display: flex; align-items: center; gap: 6px;">
           <input type="checkbox" id="selectAllRecords" onchange="toggleAllRecords(this)" />
@@ -207,6 +223,58 @@
     let adminToken = localStorage.getItem('admin_token');
     let cachedRecords = [];
     const selectedRecordIds = new Set();
+    const periodButtons = Array.from(document.querySelectorAll('[data-period-mode]'));
+    const dateFilterInput = document.getElementById('dateFilter');
+    const monthFilterInput = document.getElementById('monthFilter');
+
+    function setPeriodMode(mode, { resetValues = false } = {}) {
+      periodButtons.forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.periodMode === mode);
+      });
+
+      if (!dateFilterInput || !monthFilterInput) return;
+
+      if (mode === 'month') {
+        dateFilterInput.classList.add('hidden');
+        monthFilterInput.classList.remove('hidden');
+        if (resetValues) {
+          dateFilterInput.value = '';
+        }
+      } else {
+        monthFilterInput.classList.add('hidden');
+        dateFilterInput.classList.remove('hidden');
+        if (resetValues) {
+          monthFilterInput.value = '';
+        }
+      }
+    }
+
+    periodButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.periodMode === 'month' ? 'month' : 'date';
+        setPeriodMode(mode, { resetValues: true });
+      });
+    });
+
+    if (dateFilterInput) {
+      dateFilterInput.addEventListener('change', () => {
+        if (dateFilterInput.value) {
+          setPeriodMode('date');
+          onDateFilterChange();
+        }
+      });
+    }
+
+    if (monthFilterInput) {
+      monthFilterInput.addEventListener('change', () => {
+        if (monthFilterInput.value) {
+          setPeriodMode('month');
+          onMonthFilterChange();
+        }
+      });
+    }
+
+    setPeriodMode('date', { resetValues: true });
 
     function confirmDownload(type) {
       if (type === 'csv') {
@@ -250,6 +318,7 @@
       if (empInput) empInput.value = '';
       if (dateInput) dateInput.value = '';
       if (monthInput) monthInput.value = '';
+      setPeriodMode('date', { resetValues: true });
       cachedRecords = [];
       resetSelectionState();
       setRecordsPlaceholder('조회 조건을 선택한 뒤 조회 버튼을 눌러주세요.');
