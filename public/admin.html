@@ -32,10 +32,11 @@
     .status-approved { background: #d4edda; color: #155724; }
     .status-rejected { background: #f8d7da; color: #721c24; }
     .loading { opacity: 0.6; pointer-events: none; }
-    .photo-preview { max-width: 90px; max-height: 90px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: block; }
+    .photo-preview { max-width: 80px; max-height: 80px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: block; }
     .photo-preview:hover { transform: scale(1.05); }
     .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
     .name-cell { max-width: 120px; }
+    .emp-inline-name { display: none; margin-left: 8px; font-weight: 500; color: #333; }
     .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .section-header h3 { margin: 0; }
     .section-header-actions { display: flex; gap: 8px; font-size: 13px; }
@@ -86,12 +87,14 @@
       .records-table td.name-cell { grid-area: name; }
       .records-table td.photo-cell { grid-area: photo; text-align: center; }
       .records-table td.status-cell { grid-area: status; margin-top: 6px; }
-      .photo-preview { max-width: 72px; max-height: 72px; }
+      .photo-preview { max-width: 60px; max-height: 60px; }
       .photo-meta { display: none; }
       .section-header { flex-direction: row; align-items: center; }
       .section-header h3 { font-size: 18px; }
       .section-header-actions { gap: 6px; font-size: 11px; }
       .section-header-actions button { padding: 6px 8px; font-size: 11px; min-width: 0; }
+      .records-table td.name-cell { display: none; }
+      .emp-inline-name { display: inline-block; font-size: 13px; color: #555; }
       .status-wrapper { gap: 4px; }
       .record-filter-row { flex-direction: column; align-items: stretch; }
       .filter-group { width: 100%; }
@@ -531,14 +534,15 @@
         const statusBadge = record.photo_deleted_at
           ? '<span class="status-badge status-rejected">삭제됨</span>'
           : '';
+        const safeNameAttr = (record.name || '-').replace(/"/g, '&quot;');
         html += `<tr>
           <td class="select-cell">
             <input type="checkbox" class="record-checkbox" data-id="${record.recordId}" onchange="toggleRecordSelection(this)" />
           </td>
           <td class="time-cell">${formatTime(record.server_time)}</td>
-          <td class="emp-cell"><strong>${record.employee_id || '-'}</strong></td>
+          <td class="emp-cell"><strong>${record.employee_id || '-'}</strong><span class="emp-inline-name">${record.name || '-'}</span></td>
           <td class="name-cell">
-            <span class="truncate" title="${(record.name || '-').replace(/"/g, '&quot;')}">${record.name || '-'}</span>
+            <span class="truncate" title="${safeNameAttr}">${record.name || '-'}</span>
           </td>
           <td class="photo-cell">
             ${hasImage ? `
