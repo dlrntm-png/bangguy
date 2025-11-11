@@ -417,7 +417,7 @@
         const statusBadge = record.photo_deleted_at
           ? '<span class="status-badge status-rejected">삭제됨</span>'
           : record.cleanup_scheduled_at
-            ? '<span class="status-badge status-pending">삭제 예정</span>'
+            ? ''
             : '<span class="status-badge status-approved">보관 중</span>';
         html += `<tr>
           <td class="select-cell">
@@ -444,7 +444,7 @@
           <td class="status-cell">
             <div class="status-wrapper">
               <div class="status-meta">
-                ${statusBadge}
+                ${statusBadge || ''}
                 <span class="status-time">${cleanupTime}</span>
               </div>
               ${hasImage ? `
