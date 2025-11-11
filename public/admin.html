@@ -36,6 +36,10 @@
     .photo-preview:hover { transform: scale(1.05); }
     .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
     .name-cell { max-width: 120px; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .section-header h3 { margin: 0; }
+    .section-header-actions { display: flex; gap: 8px; font-size: 13px; }
+    .section-header-actions button { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
     .records-table table { width: 100%; border-collapse: collapse; }
     .records-table td { vertical-align: middle; }
     .status-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -44,10 +48,6 @@
     .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
     .filter-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
     .filter-actions-left { display: flex; gap: 8px; }
-    .filter-actions-right { display: flex; gap: 8px; margin-left: auto; font-size: 13px; }
-    .filter-actions-right button { padding: 6px 10px; font-size: 12px; }
-    .filter-actions-right button:nth-child(1) { white-space: nowrap; }
-    .filter-actions-right button:nth-child(2) { white-space: nowrap; }
     .filter-actions button { margin: 0; }
     .filter-hint { margin-top: 8px; font-size: 12px; color: #666; }
     details.section { margin: 20px 0; }
@@ -88,14 +88,16 @@
       .records-table td.status-cell { grid-area: status; margin-top: 6px; }
       .photo-preview { max-width: 72px; max-height: 72px; }
       .photo-meta { display: none; }
+      .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .section-header h3 { font-size: 18px; }
+      .section-header-actions { width: 100%; justify-content: space-between; gap: 6px; font-size: 12px; }
+      .section-header-actions button { flex: 1 1 48%; padding: 6px 8px; font-size: 11px; }
       .status-wrapper { gap: 4px; }
       .record-filter-row { flex-direction: column; align-items: stretch; }
       .filter-group { width: 100%; }
       .filter-actions { flex-direction: column; align-items: stretch; gap: 10px; }
       .filter-actions-left { width: 100%; gap: 6px; }
       .filter-actions-left button { flex: 1 1 auto; }
-      .filter-actions-right { width: 100%; gap: 6px; margin-left: 0; justify-content: space-between; }
-      .filter-actions-right button { flex: 1 1 48%; font-size: 11px; padding: 6px 8px; }
       .filter-hint { font-size: 11px; }
     }
   </style>
@@ -121,7 +123,13 @@
 
     <!-- 등록 기록 조회 -->
     <div class="section">
-      <h3>등록 기록 조회</h3>
+      <div class="section-header">
+        <h3>등록 기록 조회</h3>
+        <div class="section-header-actions">
+          <button onclick="downloadCSV()">CSV 다운로드</button>
+          <button onclick="downloadConsentLogs()">동의 로그 다운로드</button>
+        </div>
+      </div>
       <div class="record-filter-row">
         <div class="filter-group">
           <label for="searchEmpId">사번으로 검색</label>
@@ -140,10 +148,6 @@
         <div class="filter-actions-left">
           <button class="primary" onclick="loadRecords()">조회</button>
           <button onclick="resetRecordFilters()">필터 초기화</button>
-        </div>
-        <div class="filter-actions-right">
-          <button onclick="downloadCSV()">CSV 다운로드</button>
-          <button onclick="downloadConsentLogs()">동의 로그 다운로드</button>
         </div>
       </div>
       <p class="filter-hint">사번, 날짜 또는 월을 선택한 후 조회 버튼을 눌러주세요. 날짜와 월은 동시에 선택할 수 없습니다.</p>
