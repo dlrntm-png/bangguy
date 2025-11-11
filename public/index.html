@@ -331,8 +331,11 @@
             resBox.textContent = '';
           }, 3000); // 3초 후 초기화
         } else {
-          const reason = d.message || d.error || '등록 실패';
+          let reason = d.message || d.error || '등록 실패';
           const stampLine = stamp ? `<br>${stamp}` : '';
+          if (d.reason === 'NOT_OFFICE_IP') {
+            reason = '등록은 병원 전용 Wi-Fi (DCMC_WIFI / DCUMC)에서만 가능합니다. 연결 상태를 확인한 뒤 다시 시도해주세요.';
+          }
           resBox.innerHTML = `⚠️ ${reason}${stampLine}`;
           
           // 기기 불일치 에러 시 재등록 요청 섹션 표시
@@ -342,7 +345,7 @@
             document.getElementById('requestEmpName').value = empName;
           } else if (d.reason === 'NOT_OFFICE_IP') {
             document.getElementById('deviceRequestSection').classList.add('hidden');
-            const lines = ['등록은 병원 전용 Wi-Fi (DCMC_WIFI / DCUMC)에서만 가능합니다. 연결 상태를 확인한 뒤 다시 시도해주세요.'];
+            const lines = [reason];
             if (stamp) {
               lines.push(stamp);
             }
