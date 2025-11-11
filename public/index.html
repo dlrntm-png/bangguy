@@ -5,14 +5,32 @@
   <title>출퇴근 등록</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+    body { margin: 0; min-height: 100vh; background: #f4f6fb; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display: flex; align-items: stretch; justify-content: center; }
     body.modal-open { overflow: hidden; }
-    .row { margin: 8px 0; }
-    .badge { display:inline-block; padding:2px 6px; border-radius:4px; background:#eee; margin-left:6px; }
-    .ok { background:#d1fae5; }
-    .warn { background:#fde68a; }
-    .err { background:#fecaca; }
-    .hidden { display: none; }
+    .layout { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 18px; }
+    .card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 16px; padding: 28px 24px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12); }
+    .card h2 { margin: 0 0 12px; font-size: 24px; text-align: center; color: #0f172a; }
+    .card p.subtitle { margin: 0 0 20px; text-align: center; color: #475569; font-size: 14px; }
+    .row { margin: 14px 0; }
+    label { font-size: 14px; font-weight: 600; color: #1e293b; }
+    input[type="text"] { width: 100%; margin-top: 6px; padding: 12px; font-size: 15px; border: 1px solid #cbd5f5; border-radius: 10px; box-sizing: border-box; background: #f8fafc; }
+    input[type="text"]:focus { outline: none; border-color: #2563eb; background: #fff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#fde68a; color:#92400e; font-size:13px; font-weight:600; }
+    .badge.ok { background:#bbf7d0; color:#166534; }
+    button.primary, #submitBtn { width: 100%; padding: 13px 16px; background: #2563eb; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.08s ease, box-shadow 0.08s ease; }
+    button.primary:hover, #submitBtn:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(37, 99, 235, 0.18); }
+    button.primary:disabled, #submitBtn:disabled { background: #b0c4ff; cursor: not-allowed; box-shadow: none; transform: none; }
+    .file-upload { margin-top: 8px; }
+    .file-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; background: #0ea5e9; color: #fff; border-radius: 999px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: background 0.12s ease; }
+    .file-trigger:hover { background: #0284c7; }
+    .file-trigger:focus-visible { outline: 3px solid rgba(14, 165, 233, 0.4); outline-offset: 2px; }
+    input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    #result { min-height: 24px; font-size: 14px; color: #0f172a; }
+    .photo-preview { margin-top: 12px; display: none; }
+    .photo-preview img { width: 100%; max-width: 220px; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .photo-preview button { margin-top: 6px; padding: 6px 10px; font-size: 12px; background: #dc2626; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    .photo-preview button:hover { background: #b91c1c; }
+    .note { text-align: center; font-size: 12px; color: #64748b; margin-top: 10px; }
     .consent-section { margin: 16px 0; padding: 16px; background: #f1f5f9; border: 1px solid #d8e4fb; border-radius: 8px; }
     .consent-section h3 { margin-top: 0; font-size: 16px; }
     .consent-section p.note { margin: 4px 0 12px; color: #374151; font-size: 13px; line-height: 1.4; }
@@ -21,9 +39,6 @@
     .consent-box ul { margin: 6px 0 10px 18px; padding-left: 4px; }
     .consent-agree { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; margin-top: 12px; }
     .consent-agree input { margin-top: 4px; }
-    button.primary { padding: 8px 16px; background: #007bff; color: white; border: 1px solid #007bff; border-radius: 4px; cursor: pointer; }
-    button.primary:hover { background: #0056b3; }
-    button.primary:disabled { background: #ccc; cursor: not-allowed; }
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -34,9 +49,7 @@
       z-index: 1000;
       padding: 24px;
     }
-    .modal-overlay.show {
-      display: flex;
-    }
+    .modal-overlay.show { display: flex; }
     .modal-dialog {
       background: #ffffff;
       border-radius: 12px;
@@ -47,37 +60,12 @@
       text-align: center;
       animation: popIn 0.25s ease-out;
     }
-    .modal-dialog h3 {
-      margin-top: 0;
-      margin-bottom: 12px;
-      font-size: 20px;
-    }
-    .modal-dialog p {
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-    .modal-close-btn {
-      padding: 10px 20px;
-      border-radius: 6px;
-      border: none;
-      background: #007bff;
-      color: #fff;
-      cursor: pointer;
-      font-size: 15px;
-    }
-    .modal-close-btn:hover {
-      background: #0056b3;
-    }
-    @keyframes popIn {
-      from {
-        transform: scale(0.92);
-        opacity: 0;
-      }
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
+    .modal-dialog h3 { margin-top: 0; margin-bottom: 12px; font-size: 20px; }
+    .modal-dialog p { margin-bottom: 20px; line-height: 1.5; }
+    .modal-close-btn { padding: 10px 20px; border-radius: 6px; border: none; background: #007bff; color: #fff; cursor: pointer; font-size: 15px; }
+    .modal-close-btn:hover { background: #0056b3; }
+    @keyframes popIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @media (max-width: 420px) { .card { padding: 24px 18px; border-radius: 14px; } .card h2 { font-size: 22px; } }
   </style>
   <script>
     let lastFocusedElement = null;
@@ -99,22 +87,21 @@
     }
 
     async function loadIpStatus() {
-      const curIp = document.getElementById('curIp');
       const curOffice = document.getElementById('curOffice');
+      if (!curOffice) return;
       try {
         const r = await fetch('/api/ip-status', { cache: 'no-store' });
         const d = await r.json();
-        curIp.textContent = d.ip || '-';
         if (d.office) {
           curOffice.textContent = '사내망';
           curOffice.className = 'badge ok';
         } else {
           curOffice.textContent = '사내망 아님';
-          curOffice.className = 'badge warn';
+          curOffice.className = 'badge';
         }
       } catch {
-        curIp.textContent = '조회 실패';
-        curOffice.textContent = '-';
+        curOffice.textContent = '사내망 확인 실패';
+        curOffice.className = 'badge';
       }
     }
 
@@ -472,57 +459,69 @@
           clearPhoto();
         }
       });
+
+      const fileTrigger = document.getElementById('fileTrigger');
+      if (fileTrigger) {
+        fileTrigger.addEventListener('click', () => {
+          const fileInput = document.getElementById('photo');
+          if (fileInput) {
+            fileInput.click();
+          }
+        });
+      }
     });
   </script>
 </head>
 <body>
-  <h2>출퇴근 등록</h2>
+  <div class="layout">
+    <div class="card">
+      <h2>출퇴근 등록</h2>
+      <p class="subtitle"><span id="curOffice" class="badge">사내망 상태 확인 중</span></p>
 
-  <div class="row">현재 접속 공인 IP: <span id="curIp">조회 중...</span>
-    <span id="curOffice" class="badge">-</span>
-  </div>
+      <div class="row">
+        <label for="empId">사번</label>
+        <input id="empId" type="text" placeholder="사번" />
+      </div>
 
-  <div class="row">
-    <label>사번</label><br />
-    <input id="empId" type="text" placeholder="사번" />
-  </div>
+      <div class="row">
+        <label for="empName">이름</label>
+        <input id="empName" type="text" placeholder="이름" />
+      </div>
 
-  <div class="row">
-    <label>이름</label><br />
-    <input id="empName" type="text" placeholder="이름" />
-  </div>
+      <div class="row">
+        <label for="photo">사진</label>
+        <div class="file-upload">
+          <button type="button" id="fileTrigger" class="file-trigger">촬영</button>
+          <input id="photo" type="file" accept="image/*" capture="user" />
+        </div>
+        <div id="photoPreview" class="photo-preview">
+          <img id="previewImg" src="" alt="미리보기" />
+          <button type="button" onclick="clearPhoto()">사진 제거</button>
+        </div>
+      </div>
 
-  <div class="row">
-    <label>사진(셀피)</label><br />
-    <input id="photo" type="file" accept="image/*" capture="user" />
-    <div id="photoPreview" style="margin-top: 8px; display: none;">
-      <img id="previewImg" src="" alt="미리보기" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;" />
-      <div style="margin-top: 4px;">
-        <button type="button" onclick="clearPhoto()" style="padding: 4px 8px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">사진 제거</button>
+      <button id="submitBtn">인증(등록)</button>
+      <div class="row" id="result"></div>
+
+      <!-- 기기 재등록 요청 섹션 -->
+      <div id="deviceRequestSection" class="row hidden" style="margin-top: 16px; padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
+        <h3 style="margin-top: 0;">기기 재등록 요청</h3>
+        <p><strong>다른 기기에서 등록된 기록이 있습니다.</strong></p>
+        <p>기기를 변경하셨다면 관리자 승인을 받아야 합니다. 아래 정보를 확인하고 요청 버튼을 클릭하세요.</p>
+        <div style="margin: 12px 0;">
+          <label>사번</label><br />
+          <input id="requestEmpId" type="text" placeholder="사번" style="width: 200px; padding: 6px;" />
+        </div>
+        <div style="margin: 12px 0;">
+          <label>이름</label><br />
+          <input id="requestEmpName" type="text" placeholder="이름" style="width: 200px; padding: 6px;" />
+        </div>
+        <button id="requestDeviceBtn" class="primary">기기 재등록 요청</button>
+        <div id="requestResult"></div>
       </div>
     </div>
   </div>
 
-  <button id="submitBtn">인증(등록)</button>
-  <div class="row" id="result" style="margin-top:12px;"></div>
-
-  <!-- 기기 재등록 요청 섹션 -->
-  <div id="deviceRequestSection" class="row hidden" style="margin-top: 16px; padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
-    <h3 style="margin-top: 0;">기기 재등록 요청</h3>
-    <p><strong>다른 기기에서 등록된 기록이 있습니다.</strong></p>
-    <p>기기를 변경하셨다면 관리자 승인을 받아야 합니다. 아래 정보를 확인하고 요청 버튼을 클릭하세요.</p>
-    <div style="margin: 12px 0;">
-      <label>사번</label><br />
-      <input id="requestEmpId" type="text" placeholder="사번" style="width: 200px; padding: 6px;" />
-    </div>
-    <div style="margin: 12px 0;">
-      <label>이름</label><br />
-      <input id="requestEmpName" type="text" placeholder="이름" style="width: 200px; padding: 6px;" />
-    </div>
-    <button id="requestDeviceBtn" class="primary">기기 재등록 요청</button>
-    <div id="requestResult"></div>
-  </div>
- 
  <div id="consentOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
    <div class="modal-dialog" style="text-align: left;">
      <h3 id="consentTitle">개인정보 수집·이용 동의</h3>
