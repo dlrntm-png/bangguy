@@ -369,19 +369,21 @@
       }
 
       // 시간 포맷팅 함수
-      const formatTime = (timeStr) => {
+      const formatTime = (timeStr, shortFormat = false) => {
         if (!timeStr) return '-';
         try {
           const date = new Date(timeStr);
-          return date.toLocaleString('ko-KR', { 
-            timeZone: 'Asia/Seoul',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          });
+          const pad = (n) => String(n).padStart(2, '0');
+          const year = date.getFullYear();
+          const month = pad(date.getMonth() + 1);
+          const day = pad(date.getDate());
+          if (shortFormat) {
+            return `${month}/${day}`;
+          }
+          const hour = pad(date.getHours());
+          const minute = pad(date.getMinutes());
+          const second = pad(date.getSeconds());
+          return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
         } catch {
           return timeStr;
         }
@@ -408,9 +410,9 @@
           ? `${record.photo_width}×${record.photo_height}`
           : '-';
         const cleanupTime = record.photo_deleted_at
-          ? `삭제: ${formatTime(record.photo_deleted_at)}`
+          ? '사진 삭제됨'
           : record.cleanup_scheduled_at
-            ? `예정: ${formatTime(record.cleanup_scheduled_at)}`
+            ? `삭제 예정 ${formatTime(record.cleanup_scheduled_at, true)}`
             : '보관 중';
         const statusBadge = record.photo_deleted_at
           ? '<span class="status-badge status-rejected">삭제됨</span>'
