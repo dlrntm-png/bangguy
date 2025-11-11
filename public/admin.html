@@ -226,33 +226,60 @@
     const periodButtons = Array.from(document.querySelectorAll('[data-period-mode]'));
     const dateFilterInput = document.getElementById('dateFilter');
     const monthFilterInput = document.getElementById('monthFilter');
+    let currentPeriodMode = 'date';
 
-    function setPeriodMode(mode, { resetValues = false } = {}) {
+    function openPeriodPicker(input) {
+      if (!input) return;
+      try {
+        if (typeof input.showPicker === 'function') {
+          input.showPicker();
+          return;
+        }
+      } catch (err) {
+        console.warn('showPicker 호출 실패:', err);
+      }
+      input.focus();
+      input.click();
+    }
+
+    function setPeriodMode(mode, { resetValues = false, openPicker = false, forceReset = false } = {}) {
+      const normalizedMode = mode === 'month' ? 'month' : 'date';
+      const modeChanged = normalizedMode !== currentPeriodMode;
+
       periodButtons.forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.periodMode === mode);
+        btn.classList.toggle('active', btn.dataset.periodMode === normalizedMode);
       });
 
       if (!dateFilterInput || !monthFilterInput) return;
 
-      if (mode === 'month') {
+      if (normalizedMode === 'month') {
         dateFilterInput.classList.add('hidden');
         monthFilterInput.classList.remove('hidden');
-        if (resetValues) {
+        if (resetValues && (modeChanged || forceReset)) {
           dateFilterInput.value = '';
+          if (forceReset) monthFilterInput.value = '';
         }
       } else {
         monthFilterInput.classList.add('hidden');
         dateFilterInput.classList.remove('hidden');
-        if (resetValues) {
+        if (resetValues && (modeChanged || forceReset)) {
           monthFilterInput.value = '';
+          if (forceReset) dateFilterInput.value = '';
         }
+      }
+
+      currentPeriodMode = normalizedMode;
+
+      if (openPicker) {
+        const targetInput = normalizedMode === 'month' ? monthFilterInput : dateFilterInput;
+        requestAnimationFrame(() => openPeriodPicker(targetInput));
       }
     }
 
     periodButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.periodMode === 'month' ? 'month' : 'date';
-        setPeriodMode(mode, { resetValues: true });
+        setPeriodMode(mode, { resetValues: true, openPicker: true });
       });
     });
 
@@ -274,7 +301,7 @@
       });
     }
 
-    setPeriodMode('date', { resetValues: true });
+    setPeriodMode('date', { resetValues: true, forceReset: true });
 
     function confirmDownload(type) {
       if (type === 'csv') {
@@ -318,7 +345,7 @@
       if (empInput) empInput.value = '';
       if (dateInput) dateInput.value = '';
       if (monthInput) monthInput.value = '';
-      setPeriodMode('date', { resetValues: true });
+      setPeriodMode('date', { resetValues: true, forceReset: true });
       cachedRecords = [];
       resetSelectionState();
       setRecordsPlaceholder('조회 조건을 선택한 뒤 조회 버튼을 눌러주세요.');
