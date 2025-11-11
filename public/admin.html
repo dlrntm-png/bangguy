@@ -38,10 +38,8 @@
     .name-cell { max-width: 120px; }
     .records-table table { width: 100%; border-collapse: collapse; }
     .records-table td { vertical-align: middle; }
-    .status-wrapper { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .status-meta { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666; }
+    .status-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
     .status-time { font-size: 12px; color: #666; }
-    .action-button { padding: 6px 12px; font-size: 12px; }
     @media (max-width: 600px) {
       .records-table thead { display: none; }
       .records-table table { border-collapse: separate; border-spacing: 0 12px; }
@@ -73,13 +71,7 @@
       .records-table td.status-cell { grid-area: status; margin-top: 6px; }
       .photo-preview { max-width: 72px; max-height: 72px; }
       .photo-meta { display: none; }
-      .status-wrapper {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
-      }
-      .status-actions { display: flex; gap: 8px; width: 100%; }
-      .status-actions .action-button { width: auto; padding: 6px 10px; font-size: 12px; }
+      .status-wrapper { gap: 4px; }
     }
   </style>
 </head>
@@ -416,9 +408,7 @@
             : '보관 중';
         const statusBadge = record.photo_deleted_at
           ? '<span class="status-badge status-rejected">삭제됨</span>'
-          : record.cleanup_scheduled_at
-            ? ''
-            : '<span class="status-badge status-approved">보관 중</span>';
+          : '';
         html += `<tr>
           <td class="select-cell">
             <input type="checkbox" class="record-checkbox" data-id="${record.recordId}" onchange="toggleRecordSelection(this)" />
@@ -443,15 +433,8 @@
           </td>
           <td class="status-cell">
             <div class="status-wrapper">
-              <div class="status-meta">
-                ${statusBadge || ''}
-                <span class="status-time">${cleanupTime}</span>
-              </div>
-              ${hasImage ? `
-                <div class="status-actions">
-                  <button class="danger action-button" onclick="deletePhoto(${record.recordId}, '${(record.employee_id || '').replace(/'/g, "\\'")}')">사진 삭제</button>
-                </div>
-              ` : ''}
+              ${statusBadge || ''}
+              <span class="status-time">${cleanupTime}</span>
             </div>
           </td>
         </tr>`;
@@ -499,36 +482,6 @@
       modal.appendChild(img);
       modal.appendChild(closeBtn);
       document.body.appendChild(modal);
-    }
-
-    // 사진 삭제 함수
-    async function deletePhoto(recordId, employeeId) {
-      if (!confirm(`이 사진을 삭제하시겠습니까?\n\n사번: ${employeeId || '-'}\n\n삭제된 사진은 복구할 수 없습니다.`)) {
-        return;
-      }
-      
-      try {
-        const res = await fetch('/api/admin/delete-photo', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminToken}`
-          },
-          body: JSON.stringify({ recordId })
-        });
-        
-        const data = await res.json();
-        
-        if (data.ok) {
-          alert('✅ 사진이 삭제되었습니다.');
-          loadRecords(); // 목록 새로고침
-        } else {
-          alert('❌ ' + (data.message || '삭제 실패'));
-        }
-      } catch (e) {
-        alert('삭제 중 오류가 발생했습니다.');
-        console.error('삭제 오류:', e);
-      }
     }
 
     async function updateDeviceId() {
