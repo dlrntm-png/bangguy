@@ -36,11 +36,21 @@
     .photo-preview:hover { transform: scale(1.05); }
     .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
     .name-cell { max-width: 120px; }
+    .records-table table { width: 100%; border-collapse: collapse; }
+    .status-label { display: inline-block; margin-bottom: 4px; }
+    .action-button { padding: 6px 12px; font-size: 12px; }
     @media (max-width: 600px) {
-      table { font-size: 12px; }
-      th, td { padding: 8px 6px; }
-      .photo-preview { max-width: 70px; max-height: 70px; }
-      .truncate { max-width: 80px; }
+      table { font-size: 12px; table-layout: fixed; }
+      th, td { padding: 6px 4px; }
+      th:nth-child(1) { width: 40px; }
+      th:nth-child(2) { width: 105px; }
+      th:nth-child(3) { width: 70px; }
+      th:nth-child(4) { width: 70px; }
+      th:nth-child(5), th:nth-child(6) { width: auto; }
+      .photo-preview { max-width: 60px; max-height: 60px; }
+      .photo-meta { display: none; }
+      .action-button { padding: 4px 8px; font-size: 11px; margin-top: 4px; }
+      .status-label { display: block; margin-bottom: 4px; }
     }
   </style>
 </head>
@@ -322,6 +332,7 @@
 
     function displayRecords(records) {
       const tableDiv = document.getElementById('recordsTable');
+      tableDiv.className = 'records-table';
       if (!records || records.length === 0) {
         tableDiv.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">등록 기록이 없습니다.</p>';
         updateSelectedCount();
@@ -359,7 +370,7 @@
         return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[unitIndex]}`;
       };
 
-      let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>사진</th><th>상태</th><th>작업</th></tr></thead><tbody>';
+      let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>사진</th><th>상태 / 작업</th></tr></thead><tbody>';
       records.forEach(record => {
         const imageUrl = record.file || '';
         const hasImage = Boolean(imageUrl);
@@ -389,21 +400,18 @@
                      alt="미리보기"
                      class="photo-preview"
                      onclick="showImageModal('${imageUrl}', '사진 미리보기')" />
-                <div style="margin-top: 4px; font-size: 0.75em; color: #666;">
+                <div class="photo-meta" style="margin-top: 4px; font-size: 0.75em; color: #666;">
                   ${sizeLabel} · ${resolutionLabel}
                 </div>
               </div>
             ` : '<span style="color: #999;">-</span>'}
           </td>
           <td>
-            ${statusBadge}<br />
-            <span style="font-size: 12px; color: #666;">${cleanupTime}</span>
-          </td>
-          <td>
+            <span class="status-label">${statusBadge}</span>
+            <span style="display: block; font-size: 12px; color: #666;">${cleanupTime}</span>
             ${hasImage ? `
-              <button class="danger" onclick="deletePhoto(${record.recordId}, '${(record.employee_id || '').replace(/'/g, "\\'")}')" 
-                      style="padding: 4px 8px; font-size: 12px;">사진 삭제</button>
-            ` : '-'}
+              <button class="danger action-button" onclick="deletePhoto(${record.recordId}, '${(record.employee_id || '').replace(/'/g, "\\'")}')">사진 삭제</button>
+            ` : ''}
           </td>
         </tr>`;
       });
