@@ -129,6 +129,14 @@
       .period-buttons { width: 100%; }
       .period-btn { flex: 1 1 calc(50% - 6px); }
       .period-clear { width: 100%; }
+      .filter-period input[type="date"],
+      .filter-period input[type="month"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: auto;
+        width: 1px;
+        height: 1px;
+      }
     }
   </style>
 </head>
