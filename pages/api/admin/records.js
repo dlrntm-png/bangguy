@@ -1,6 +1,29 @@
 import { verifyAdminToken } from '../../../lib/adminAuth';
 import { getRecords } from '../../../lib/db';
 
+function buildDayRangeKst(dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const start = new Date(`${dateStr}T00:00:00+09:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function buildMonthRangeKst(monthStr) {
+  if (!/^\d{4}-\d{2}$/.test(monthStr)) return null;
+  const start = new Date(`${monthStr}-01T00:00:00+09:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const [yearStr, monthStrNum] = monthStr.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStrNum);
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return null;
+  const nextMonth =
+    month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+  const end = new Date(`${nextMonth}-01T00:00:00+09:00`);
+  if (Number.isNaN(end.getTime())) return null;
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 export default async function handler(req, res) {
   try {
     verifyAdminToken(req);
@@ -9,9 +32,32 @@ export default async function handler(req, res) {
   }
 
   const employeeId = req.query.employeeId ? String(req.query.employeeId).trim() : null;
+  const dateQuery = req.query.date ? String(req.query.date).trim() : null;
+  const monthQuery = req.query.month ? String(req.query.month).trim() : null;
+
+  if (dateQuery && monthQuery) {
+    return res.status(400).json({ ok: false, message: '날짜와 월을 동시에 사용할 수 없습니다.' });
+  }
+
+  let range = null;
+  if (dateQuery) {
+    range = buildDayRangeKst(dateQuery);
+    if (!range) {
+      return res.status(400).json({ ok: false, message: '잘못된 날짜 형식입니다. (예: 2025-11-11)' });
+    }
+  } else if (monthQuery) {
+    range = buildMonthRangeKst(monthQuery);
+    if (!range) {
+      return res.status(400).json({ ok: false, message: '잘못된 월 형식입니다. (예: 2025-11)' });
+    }
+  }
 
   try {
-    const records = await getRecords(employeeId);
+    const records = await getRecords({
+      employeeId,
+      startISO: range?.start,
+      endISO: range?.end
+    });
     const mapped = records.map((row) => ({
       recordId: row.id,
       server_time: row.server_time,
