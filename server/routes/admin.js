@@ -627,7 +627,8 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 });
 
 // 사진 프록시 (CORS 문제 해결)
-router.get('/photo/:path(*)', requireAdmin, async (req, res) => {
+// 인증 없이 접근 가능하지만, pathname이 attendance/로 시작하는지 검증
+router.get('/photo/:path(*)', async (req, res) => {
   // 경로에서 pathname 추출
   let pathname = req.params.path;
   
@@ -637,11 +638,17 @@ router.get('/photo/:path(*)', requireAdmin, async (req, res) => {
       pathname = decodeURIComponent(pathname);
     } catch (err) {
       console.warn('[admin/photo] URL 디코딩 실패:', err.message);
+      return res.status(400).json({ ok: false, message: '잘못된 파일 경로입니다.' });
     }
   }
   
   if (!pathname) {
     return res.status(400).json({ ok: false, message: '파일 경로가 필요합니다.' });
+  }
+
+  // 보안: attendance/로 시작하는 파일만 허용
+  if (!pathname.startsWith('attendance/')) {
+    return res.status(403).json({ ok: false, message: '접근 권한이 없습니다.' });
   }
 
   try {
