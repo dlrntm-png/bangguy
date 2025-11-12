@@ -622,9 +622,9 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 });
 
 // 사진 프록시 (CORS 문제 해결)
-router.get('/photo/*', requireAdmin, async (req, res) => {
-  // 경로에서 pathname 추출 (와일드카드 매칭)
-  let pathname = req.params[0];
+router.get('/photo/:path(*)', requireAdmin, async (req, res) => {
+  // 경로에서 pathname 추출
+  let pathname = req.params.path;
   
   // URL 디코딩
   if (pathname) {
