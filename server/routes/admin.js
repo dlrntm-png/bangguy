@@ -1,0 +1,514 @@
+import express from 'express';
+import { verifyAdminToken } from '../../lib/adminAuth.js';
+import { getAdminPasswordHash } from '../../lib/db.js';
+import {
+  DEFAULT_ADMIN_PASSWORD_HASH,
+  verifyPasswordHash
+} from '../../lib/password.js';
+import { issueAdminToken } from '../../lib/adminAuth.js';
+import { getRecords, getAllRecordsRaw } from '../../lib/db.js';
+import {
+  deleteRecordsByIds,
+  deleteAllRecords
+} from '../../lib/db.js';
+import { deleteBlob } from '../../lib/blob.js';
+import { getDeviceRequests } from '../../lib/db.js';
+import { getRecordById, clearPhotoFields } from '../../lib/db.js';
+import { updateDeviceId } from '../../lib/db.js';
+import { approveDeviceRequest, rejectDeviceRequest } from '../../lib/db.js';
+import { buildCsv } from '../../lib/csv.js';
+import { listBlobs } from '../../lib/blob.js';
+import { getConsentLogs } from '../../lib/consent.js';
+
+const router = express.Router();
+
+// 관리자 인증 미들웨어
+const requireAdmin = (req, res, next) => {
+  try {
+    verifyAdminToken(req);
+    next();
+  } catch (err) {
+    return res.status(401).json({ ok: false, message: err.message || '인증 실패' });
+  }
+};
+
+// 로그인
+router.post('/login', async (req, res) => {
+  const { password } = req.body || {};
+  const isDevMode = process.env.NODE_ENV !== 'production';
+  const allowFallback =
+    isDevMode && process.env.ALLOW_DEV_ADMIN_PASSWORD !== 'false';
+  const fallbackPassword =
+    allowFallback && (process.env.ADMIN_PASSWORD || 'admin123');
+
+  if (!password) {
+    return res.status(400).json({ ok: false, message: '비밀번호를 입력해주세요.' });
+  }
+
+  try {
+    const record = await getAdminPasswordHash();
+    const envHash =
+      (process.env.ADMIN_PASSWORD_HASH || DEFAULT_ADMIN_PASSWORD_HASH || '').trim() ||
+      null;
+    const storedHash = record?.password_hash || envHash;
+
+    if (storedHash) {
+      const valid = verifyPasswordHash(password, storedHash);
+      if (!valid) {
+        return res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' });
+      }
+    } else if (fallbackPassword) {
+      if (password !== fallbackPassword) {
+        return res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' });
+      }
+    } else {
+      return res.status(503).json({
+        ok: false,
+        message:
+          '관리자 비밀번호가 초기화되지 않았습니다. 환경 변수 ADMIN_PASSWORD_HASH 를 설정하거나 비밀번호 변경 API로 초기 비밀번호를 등록하세요.'
+      });
+    }
+  } catch (err) {
+    console.error('login error (password lookup):', err);
+    return res.status(500).json({ ok: false, message: '로그인 정보를 확인할 수 없습니다.' });
+  }
+
+  try {
+    const token = issueAdminToken();
+    return res.status(200).json({ ok: true, token, message: '로그인 성공' });
+  } catch (err) {
+    console.error('login error:', err);
+    return res.status(500).json({ ok: false, message: '토큰 발급 실패' });
+  }
+});
+
+// 인증 확인
+router.get('/check', requireAdmin, (req, res) => {
+  res.status(200).json({ ok: true, message: '인증됨' });
+});
+
+// 기록 조회
+router.get('/records', requireAdmin, async (req, res) => {
+  function buildDayRangeKst(dateStr) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+    const start = new Date(`${dateStr}T00:00:00+09:00`);
+    if (Number.isNaN(start.getTime())) return null;
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+
+  function buildMonthRangeKst(monthStr) {
+    if (!/^\d{4}-\d{2}$/.test(monthStr)) return null;
+    const start = new Date(`${monthStr}-01T00:00:00+09:00`);
+    if (Number.isNaN(start.getTime())) return null;
+    const [yearStr, monthStrNum] = monthStr.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStrNum);
+    if (!Number.isInteger(year) || !Number.isInteger(month)) return null;
+    const nextMonth =
+      month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+    const end = new Date(`${nextMonth}-01T00:00:00+09:00`);
+    if (Number.isNaN(end.getTime())) return null;
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+
+  const employeeId = req.query.employeeId ? String(req.query.employeeId).trim() : null;
+  const dateQuery = req.query.date ? String(req.query.date).trim() : null;
+  const monthQuery = req.query.month ? String(req.query.month).trim() : null;
+
+  if (dateQuery && monthQuery) {
+    return res.status(400).json({ ok: false, message: '날짜와 월을 동시에 사용할 수 없습니다.' });
+  }
+
+  let range = null;
+  if (dateQuery) {
+    range = buildDayRangeKst(dateQuery);
+    if (!range) {
+      return res.status(400).json({ ok: false, message: '잘못된 날짜 형식입니다. (예: 2025-11-11)' });
+    }
+  } else if (monthQuery) {
+    range = buildMonthRangeKst(monthQuery);
+    if (!range) {
+      return res.status(400).json({ ok: false, message: '잘못된 월 형식입니다. (예: 2025-11)' });
+    }
+  }
+
+  try {
+    const records = await getRecords({
+      employeeId,
+      startISO: range?.start,
+      endISO: range?.end
+    });
+    const mapped = records.map((row) => ({
+      recordId: row.id,
+      server_time: row.server_time,
+      employee_id: row.employee_id,
+      name: row.name,
+      ip: row.ip,
+      file: row.photo_url,
+      photo_blob_path: row.photo_blob_path,
+      photo_content_type: row.photo_content_type,
+      photo_size: row.photo_size,
+      photo_width: row.photo_width,
+      photo_height: row.photo_height,
+      office: row.office,
+      device_id: row.device_id,
+      image_hash: row.image_hash,
+      cleanup_scheduled_at: row.cleanup_scheduled_at,
+      photo_deleted_at: row.photo_deleted_at,
+      backup_blob_path: row.backup_blob_path,
+      backup_generated_at: row.backup_generated_at
+    }));
+
+    return res.status(200).json({ ok: true, records: mapped });
+  } catch (err) {
+    console.error('records error:', err);
+    return res.status(500).json({ ok: false, message: '기록 조회 실패' });
+  }
+});
+
+// 기록 삭제
+router.post('/delete-records', requireAdmin, async (req, res) => {
+  const { recordIds, deleteAll } = req.body || {};
+
+  try {
+    let deleted = 0;
+    let blobPaths = [];
+
+    if (deleteAll) {
+      const rows = await deleteAllRecords();
+      deleted = rows.length;
+      blobPaths = rows
+        .map((row) => row.photo_blob_path)
+        .filter(Boolean);
+    } else {
+      if (!Array.isArray(recordIds) || recordIds.length === 0) {
+        return res.status(400).json({ ok: false, message: '삭제할 기록을 선택해주세요.' });
+      }
+      const ids = recordIds.map(Number).filter((n) => Number.isInteger(n));
+      if (ids.length === 0) {
+        return res.status(400).json({ ok: false, message: '유효한 기록 번호가 없습니다.' });
+      }
+      const rows = await deleteRecordsByIds(ids);
+      deleted = rows.length;
+      if (deleted === 0) {
+        return res.status(404).json({ ok: false, message: '선택한 기록을 찾을 수 없습니다.' });
+      }
+      blobPaths = rows
+        .map((row) => row.photo_blob_path)
+        .filter(Boolean);
+    }
+
+    // 대량 삭제 시 배치 처리로 타임아웃 방지
+    const BATCH_SIZE = 50;
+    let deletedFiles = 0;
+    let failedFiles = 0;
+
+    if (blobPaths.length > 0) {
+      for (let i = 0; i < blobPaths.length; i += BATCH_SIZE) {
+        const batch = blobPaths.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map((path) => deleteBlob(path).catch((err) => {
+            console.warn(`[delete-records] Blob 삭제 실패: ${path}`, err?.message);
+            throw err;
+          }))
+        );
+        
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            deletedFiles++;
+          } else {
+            failedFiles++;
+          }
+        });
+
+        // 배치 간 짧은 대기 (API 제한 방지)
+        if (i + BATCH_SIZE < blobPaths.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      deleted,
+      deletedFiles,
+      failedFiles,
+      message: `${deleted}건의 기록과 ${deletedFiles}개의 파일이 삭제되었습니다.${failedFiles > 0 ? ` (${failedFiles}개 파일 삭제 실패)` : ''}`
+    });
+  } catch (err) {
+    console.error('delete-records error:', err);
+    return res.status(500).json({ ok: false, message: '삭제 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// 사진 삭제
+router.post('/delete-photo', requireAdmin, async (req, res) => {
+  const { recordId } = req.body || {};
+  if (!recordId) {
+    return res.status(400).json({ ok: false, message: 'recordId가 필요합니다.' });
+  }
+
+  try {
+    const record = await getRecordById(Number(recordId));
+    if (!record) {
+      return res.status(404).json({ ok: false, message: '기록을 찾을 수 없습니다.' });
+    }
+
+    if (record.photo_blob_path) {
+      await deleteBlob(record.photo_blob_path);
+    }
+
+    await clearPhotoFields(record.id);
+
+    return res.status(200).json({ ok: true, message: '사진이 삭제되었습니다.' });
+  } catch (err) {
+    console.error('delete-photo error:', err);
+    return res.status(500).json({ ok: false, message: '파일 삭제 실패' });
+  }
+});
+
+// 기기 ID 업데이트
+router.post('/update-device', requireAdmin, async (req, res) => {
+  const { employeeId, deviceId } = req.body || {};
+  if (!employeeId || !deviceId) {
+    return res.status(400).json({ ok: false, message: 'employeeId와 deviceId가 필요합니다.' });
+  }
+
+  try {
+    await updateDeviceId(employeeId, deviceId);
+    return res.status(200).json({ ok: true, message: '기기 ID가 업데이트되었습니다.' });
+  } catch (err) {
+    console.error('update-device error:', err);
+    return res.status(500).json({ ok: false, message: '기기 ID 업데이트 실패' });
+  }
+});
+
+// 기기 재등록 요청 조회
+router.get('/device-requests', requireAdmin, async (req, res) => {
+  const status = req.query.status ? String(req.query.status) : 'all';
+
+  try {
+    const requests = await getDeviceRequests(status === 'all' ? null : status);
+    const mapped = requests.map((row) => ({
+      id: row.request_id,
+      employeeId: row.employee_id,
+      name: row.name,
+      deviceId: row.device_id,
+      requestedAt: row.requested_at,
+      status: row.status,
+      approvedAt: row.approved_at,
+      rejectedAt: row.rejected_at
+    }));
+
+    return res.status(200).json({ ok: true, requests: mapped });
+  } catch (err) {
+    console.error('device-requests error:', err);
+    return res.status(500).json({ ok: false, message: '조회 실패' });
+  }
+});
+
+// 기기 재등록 요청 승인
+router.post('/approve-device-request', requireAdmin, async (req, res) => {
+  const { requestId } = req.body || {};
+  if (!requestId) {
+    return res.status(400).json({ ok: false, message: 'requestId가 필요합니다.' });
+  }
+
+  try {
+    await approveDeviceRequest(requestId);
+    return res.status(200).json({ ok: true, message: '요청이 승인되었습니다.' });
+  } catch (err) {
+    console.error('approve-device-request error:', err);
+    return res.status(500).json({ ok: false, message: '승인 처리 실패' });
+  }
+});
+
+// 기기 재등록 요청 거부
+router.post('/reject-device-request', requireAdmin, async (req, res) => {
+  const { requestId } = req.body || {};
+  if (!requestId) {
+    return res.status(400).json({ ok: false, message: 'requestId가 필요합니다.' });
+  }
+
+  try {
+    await rejectDeviceRequest(requestId);
+    return res.status(200).json({ ok: true, message: '요청이 거부되었습니다.' });
+  } catch (err) {
+    console.error('reject-device-request error:', err);
+    return res.status(500).json({ ok: false, message: '거부 처리 실패' });
+  }
+});
+
+// CSV 다운로드
+router.get('/download-csv', requireAdmin, async (req, res) => {
+  try {
+    const rows = await getAllRecordsRaw();
+    
+    function formatKst(value) {
+      if (!value) return '';
+      try {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+        const pad = (n) => String(n).padStart(2, '0');
+        return [
+          `${kst.getFullYear()}-${pad(kst.getMonth() + 1)}-${pad(kst.getDate())}`,
+          `${pad(kst.getHours())}:${pad(kst.getMinutes())}:${pad(kst.getSeconds())}`
+        ].join(' ');
+      } catch {
+        return String(value);
+      }
+    }
+
+    const csv = buildCsv(rows, [
+      { header: 'server_time', value: (row) => formatKst(row.server_time) },
+      { key: 'employee_id' },
+      { key: 'name' },
+      { key: 'ip' },
+      { key: 'photo_url' },
+      { key: 'photo_blob_path' },
+      { key: 'photo_content_type' },
+      { key: 'photo_size' },
+      { key: 'photo_width' },
+      { key: 'photo_height' },
+      { header: 'office', value: (row) => (row.office ? 'true' : 'false') },
+      { key: 'device_id' },
+      { key: 'image_hash' },
+      { header: 'cleanup_scheduled_at', value: (row) => formatKst(row.cleanup_scheduled_at) },
+      { header: 'photo_deleted_at', value: (row) => formatKst(row.photo_deleted_at) },
+      { key: 'backup_blob_path' },
+      { header: 'backup_generated_at', value: (row) => formatKst(row.backup_generated_at) }
+    ]);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance_${new Date().toISOString().split('T')[0]}.csv"`);
+    return res.status(200).send(csv);
+  } catch (err) {
+    console.error('download-csv error:', err);
+    return res.status(500).json({ ok: false, message: '다운로드 실패' });
+  }
+});
+
+// 전체 Blob 삭제
+router.post('/delete-all-blobs', requireAdmin, async (req, res) => {
+  const { prefix, confirm } = req.body || {};
+
+  if (confirm !== 'DELETE_ALL_BLOBS') {
+    return res.status(400).json({
+      ok: false,
+      message: '안전을 위해 confirm 파라미터가 필요합니다. { confirm: "DELETE_ALL_BLOBS" }'
+    });
+  }
+
+  try {
+    console.log(`[delete-all-blobs] 시작 - prefix: ${prefix || '(전체)'}`);
+    
+    const blobs = await listBlobs(prefix || '');
+    console.log(`[delete-all-blobs] 발견된 Blob 수: ${blobs.length}`);
+
+    if (blobs.length === 0) {
+      return res.status(200).json({
+        ok: true,
+        deleted: 0,
+        message: '삭제할 Blob이 없습니다.'
+      });
+    }
+
+    const BATCH_SIZE = 50;
+    let deleted = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (let i = 0; i < blobs.length; i += BATCH_SIZE) {
+      const batch = blobs.slice(i, i + BATCH_SIZE);
+      console.log(`[delete-all-blobs] 배치 ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(blobs.length / BATCH_SIZE)} 처리 중... (${batch.length}개)`);
+      
+      const results = await Promise.allSettled(
+        batch.map((blob) => deleteBlob(blob.pathname))
+      );
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          deleted++;
+        } else {
+          failed++;
+          errors.push({
+            pathname: batch[idx].pathname,
+            error: result.reason?.message || String(result.reason)
+          });
+        }
+      });
+
+      if (i + BATCH_SIZE < blobs.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`[delete-all-blobs] 완료 - 삭제: ${deleted}, 실패: ${failed}`);
+
+    return res.status(200).json({
+      ok: true,
+      deleted,
+      failed,
+      total: blobs.length,
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      message: `${deleted}개의 Blob이 삭제되었습니다.${failed > 0 ? ` (${failed}개 실패)` : ''}`
+    });
+  } catch (err) {
+    console.error('[delete-all-blobs] 오류:', err);
+    return res.status(500).json({
+      ok: false,
+      message: 'Blob 삭제 처리 중 오류가 발생했습니다.',
+      error: err.message
+    });
+  }
+});
+
+// 동의 로그 다운로드
+router.get('/download-consent-logs', requireAdmin, async (req, res) => {
+  try {
+    const logs = await getConsentLogs();
+    if (!logs || logs.length === 0) {
+      return res.status(204).end();
+    }
+
+    function formatKst(value) {
+      if (!value) return '';
+      try {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${kst.getFullYear()}-${pad(kst.getMonth() + 1)}-${pad(kst.getDate())} ${pad(kst.getHours())}:${pad(kst.getMinutes())}:${pad(kst.getSeconds())}`;
+      } catch {
+        return String(value);
+      }
+    }
+
+    const csv = buildCsv(logs, [
+      { header: 'consented_at', value: (row) => formatKst(row.consentedAt) },
+      { key: 'employeeId', header: 'employee_id' },
+      { key: 'name' },
+      { key: 'deviceId', header: 'device_id' },
+      { key: 'ip' },
+      { key: 'userAgent', header: 'user_agent' },
+      { key: 'blobPath', header: 'blob_path' },
+      { key: 'blobSize', header: 'blob_size' },
+      { header: 'uploaded_at', value: (row) => formatKst(row.uploadedAt) }
+    ]);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="consent_logs_${new Date().toISOString().split('T')[0]}.csv"`
+    );
+    return res.status(200).send(csv);
+  } catch (err) {
+    console.error('[admin] download consent logs error:', err);
+    return res.status(500).json({ ok: false, message: '동의 로그 다운로드에 실패했습니다.' });
+  }
+});
+
+export default router;
+

@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: bangguy
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start:server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # 아래 환경 변수들은 Render 대시보드에서 설정하세요
+      # - key: POSTGRES_URL
+      #   value: your-postgres-url
+      # - key: BLOB_READ_WRITE_TOKEN
+      #   value: your-blob-token
+      # - key: ADMIN_PASSWORD_HASH
+      #   value: your-admin-hash
+      # - key: ADMIN_JWT_SECRET
+      #   value: your-jwt-secret
+      # - key: OFFICE_IPS
+      #   value: your-office-ips
+
