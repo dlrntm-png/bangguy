@@ -152,7 +152,8 @@ router.get('/records', requireAdmin, async (req, res) => {
         } else {
           // Public URL이 없으면 항상 프록시 URL 사용 (signed URL 무시)
           // pathname을 URL 인코딩하여 프록시 경로 생성
-          const encodedPath = encodeURIComponent(row.photo_blob_path);
+          // 슬래시도 인코딩되어야 함
+          const encodedPath = encodeURIComponent(row.photo_blob_path).replace(/%2F/g, '/');
           photoUrl = `/api/admin/photo/${encodedPath}`;
         }
       } else if (row.photo_blob_path) {
@@ -628,9 +629,10 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 
 // 사진 프록시 (CORS 문제 해결)
 // 인증 없이 접근 가능하지만, pathname이 attendance/로 시작하는지 검증
-router.get('/photo/:path(*)', async (req, res) => {
-  // 경로에서 pathname 추출
-  let pathname = req.params.path;
+router.get('/photo/*', async (req, res) => {
+  // 경로에서 pathname 추출 (와일드카드 매칭)
+  // req.path에서 /api/admin/photo/ 부분을 제거
+  let pathname = req.path.replace(/^\/api\/admin\/photo\//, '');
   
   // URL 디코딩
   if (pathname) {
@@ -638,7 +640,7 @@ router.get('/photo/:path(*)', async (req, res) => {
       pathname = decodeURIComponent(pathname);
     } catch (err) {
       console.warn('[admin/photo] URL 디코딩 실패:', err.message);
-      return res.status(400).json({ ok: false, message: '잘못된 파일 경로입니다.' });
+      // 디코딩 실패 시 원본 경로 사용
     }
   }
   
@@ -648,8 +650,11 @@ router.get('/photo/:path(*)', async (req, res) => {
 
   // 보안: attendance/로 시작하는 파일만 허용
   if (!pathname.startsWith('attendance/')) {
+    console.warn(`[admin/photo] 접근 거부: ${pathname}`);
     return res.status(403).json({ ok: false, message: '접근 권한이 없습니다.' });
   }
+  
+  console.log(`[admin/photo] 요청: ${pathname}`);
 
   try {
     // Blob에서 이미지 읽기
