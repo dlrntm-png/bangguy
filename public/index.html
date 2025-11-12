@@ -72,17 +72,105 @@
     const consentCache = {};
     const STORAGE_KEYS = {
       employeeId: 'attendance_emp_id',
-      employeeName: 'attendance_emp_name'
+      employeeName: 'attendance_emp_name',
+      deviceId: 'attendance_device_id'
     };
+    const COOKIE_KEYS = {
+      deviceId: 'attendance_device_id'
+    };
+
+    // 안전하게 localStorage를 다루기 위한 헬퍼 (일부 모바일 브라우저에서는 접근 자체가 예외를 던질 수 있음)
+    const safeStorage = {
+      get(key) {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (err) {
+          console.warn('[storage] localStorage.getItem 실패:', err);
+          return null;
+        }
+      },
+      set(key, value) {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (err) {
+          console.warn('[storage] localStorage.setItem 실패:', err);
+        }
+      },
+      remove(key) {
+        try {
+          window.localStorage.removeItem(key);
+        } catch (err) {
+          console.warn('[storage] localStorage.removeItem 실패:', err);
+        }
+      }
+    };
+
+    // 쿠키 읽기/쓰기 헬퍼 (기기 ID 유지를 위한 보조 저장소)
+    function readCookie(name) {
+      try {
+        const pattern = `${encodeURIComponent(name)}=`;
+        const parts = document.cookie.split(';');
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (trimmed.startsWith(pattern)) {
+            return decodeURIComponent(trimmed.substring(pattern.length));
+          }
+        }
+      } catch (err) {
+        console.warn('[cookie] read 실패:', err);
+      }
+      return null;
+    }
+
+    function writeCookie(name, value, options = {}) {
+      try {
+        const opts = { path: '/', maxAgeDays: 365, ...options };
+        const expires = new Date(Date.now() + opts.maxAgeDays * 24 * 60 * 60 * 1000);
+        const cookie = [
+          `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
+          `path=${opts.path}`,
+          `expires=${expires.toUTCString()}`,
+          'SameSite=Lax'
+        ];
+        if (opts.secure) {
+          cookie.push('Secure');
+        }
+        document.cookie = cookie.join('; ');
+      } catch (err) {
+        console.warn('[cookie] write 실패:', err);
+      }
+    }
+
+    // 기기 ID를 안전하게 저장 (localStorage + Cookie)
+    function persistDeviceId(deviceId) {
+      if (!deviceId) return;
+      safeStorage.set(STORAGE_KEYS.deviceId, deviceId);
+      writeCookie(COOKIE_KEYS.deviceId, deviceId);
+    }
+
+    // 기기 고유 ID 생성 함수 (충돌 가능성을 최소화하기 위해 타임스탬프 + 랜덤 조합 사용)
+    function createNewDeviceId() {
+      return `dev_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    }
 
     // 기기 고유 ID 생성/조회 함수
     function getDeviceId() {
-      let deviceId = localStorage.getItem('attendance_device_id');
+      // 1) localStorage에서 기기 ID 조회 (가능한 경우)
+      let deviceId = safeStorage.get(STORAGE_KEYS.deviceId);
+
+      // 2) localStorage가 비어있다면 Cookie에서 복구 시도
       if (!deviceId) {
-        // 고유 ID 생성 (랜덤 문자열 + 타임스탬프)
-        deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('attendance_device_id', deviceId);
+        deviceId = readCookie(COOKIE_KEYS.deviceId);
       }
+
+      // 3) 두 저장소 모두 비어있다면 새 ID 생성
+      if (!deviceId) {
+        deviceId = createNewDeviceId();
+      }
+
+      // 4) 조회/생성된 ID를 다시 저장소에 동기화 (둘 중 하나라도 비어있을 수 있으므로)
+      persistDeviceId(deviceId);
+
       return deviceId;
     }
 
@@ -227,9 +315,10 @@
     }
 
     function storeUserInfo(empId, empName) {
+      persistDeviceId(getDeviceId()); // 동기화 보장을 위해 호출
       try {
-        localStorage.setItem(STORAGE_KEYS.employeeId, empId);
-        localStorage.setItem(STORAGE_KEYS.employeeName, empName);
+        safeStorage.set(STORAGE_KEYS.employeeId, empId);
+        safeStorage.set(STORAGE_KEYS.employeeName, empName);
       } catch (err) {
         console.warn('사용자 정보 저장 실패:', err);
       }
@@ -237,8 +326,8 @@
 
     function restoreUserInfo() {
       try {
-        const storedId = localStorage.getItem(STORAGE_KEYS.employeeId);
-        const storedName = localStorage.getItem(STORAGE_KEYS.employeeName);
+        const storedId = safeStorage.get(STORAGE_KEYS.employeeId);
+        const storedName = safeStorage.get(STORAGE_KEYS.employeeName);
         if (storedId) document.getElementById('empId').value = storedId;
         if (storedName) document.getElementById('empName').value = storedName;
       } catch (err) {
@@ -248,8 +337,8 @@
 
     function clearStoredUserInfo() {
       try {
-        localStorage.removeItem(STORAGE_KEYS.employeeId);
-        localStorage.removeItem(STORAGE_KEYS.employeeName);
+        safeStorage.remove(STORAGE_KEYS.employeeId);
+        safeStorage.remove(STORAGE_KEYS.employeeName);
       } catch (err) {
         console.warn('사용자 정보 삭제 실패:', err);
       }
