@@ -627,16 +627,12 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 
 // 사진 프록시 (CORS 문제 해결)
 // 인증 없이 접근 가능하지만, pathname이 attendance/로 시작하는지 검증
-// Express 와일드카드 라우팅: /photo/* 대신 /photo/:path(*) 사용
-router.get('/photo/:path(*)', async (req, res) => {
-  // 경로에서 pathname 추출
-  let pathname = req.params.path;
-  
-  if (!pathname) {
-    // params.path가 없으면 req.url에서 직접 추출
-    const fullPath = req.url.split('?')[0];
-    pathname = fullPath.replace(/^\/api\/admin\/photo\//, '');
-  }
+// Express 와일드카드 라우팅: 모든 경로를 매칭하도록 설정
+router.get('/photo/*', async (req, res) => {
+  // req.url에서 전체 경로 추출
+  // 예: /api/admin/photo/attendance/xxx.webp -> attendance/xxx.webp
+  let fullPath = req.url.split('?')[0]; // 쿼리 스트링 제거
+  let pathname = fullPath.replace(/^\/api\/admin\/photo\/?/, ''); // /api/admin/photo/ 제거
   
   // URL 디코딩
   if (pathname) {
@@ -649,7 +645,7 @@ router.get('/photo/:path(*)', async (req, res) => {
   }
   
   if (!pathname) {
-    console.error(`[admin/photo] 경로 없음 - req.url: ${req.url}, req.path: ${req.path}, params:`, req.params);
+    console.error(`[admin/photo] 경로 없음 - req.url: ${req.url}, req.path: ${req.path}, req.params:`, req.params);
     return res.status(400).json({ ok: false, message: '파일 경로가 필요합니다.' });
   }
 
@@ -662,7 +658,7 @@ router.get('/photo/:path(*)', async (req, res) => {
   
   // 정규화된 경로 사용
   const finalPathname = normalizedPath;
-  console.log(`[admin/photo] 요청: ${finalPathname}`);
+  console.log(`[admin/photo] 요청 성공: ${finalPathname}`);
 
   try {
     // Blob에서 이미지 읽기
