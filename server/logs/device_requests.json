@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1762482499145",
+    "employeeId": "170200",
+    "name": "전병관",
+    "deviceId": "dev_1762480090706_8a3oj02j2h3",
+    "requestedAt": "2025-11-07T02:28:19.000Z",
+    "status": "approved",
+    "approvedAt": "2025-11-07T02:28:34.000Z",
+    "rejectedAt": null
+  }
+]

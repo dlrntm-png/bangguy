@@ -15,7 +15,7 @@ import { deleteBlob } from '../../lib/blob.js';
 import { getDeviceRequests, getDeviceRequestById, completeDeviceRequest, updateDeviceId } from '../../lib/db.js';
 import { getRecordById, clearPhotoFields } from '../../lib/db.js';
 import { buildCsv } from '../../lib/csv.js';
-import { listBlobs } from '../../lib/blob.js';
+import { listBlobs, getStorageUsage, createSignedBlobDownload } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
 
 const router = express.Router();
@@ -137,25 +137,44 @@ router.get('/records', requireAdmin, async (req, res) => {
       startISO: range?.start,
       endISO: range?.end
     });
-    const mapped = records.map((row) => ({
-      recordId: row.id,
-      server_time: row.server_time,
-      employee_id: row.employee_id,
-      name: row.name,
-      ip: row.ip,
-      file: row.photo_url,
-      photo_blob_path: row.photo_blob_path,
-      photo_content_type: row.photo_content_type,
-      photo_size: row.photo_size,
-      photo_width: row.photo_width,
-      photo_height: row.photo_height,
-      office: row.office,
-      device_id: row.device_id,
-      image_hash: row.image_hash,
-      cleanup_scheduled_at: row.cleanup_scheduled_at,
-      photo_deleted_at: row.photo_deleted_at,
-      backup_blob_path: row.backup_blob_path,
-      backup_generated_at: row.backup_generated_at
+    // 사진 URL 생성 (B2 사용 시 signed URL 필요할 수 있음)
+    const mapped = await Promise.all(records.map(async (row) => {
+      let photoUrl = row.photo_url;
+      
+      // B2를 사용하고 pathname만 있는 경우 signed URL 생성
+      if (row.photo_blob_path && process.env.B2_ENDPOINT) {
+        // URL이 pathname 형식이거나 없으면 signed URL 생성
+        if (!photoUrl || photoUrl === row.photo_blob_path || !photoUrl.startsWith('http')) {
+          try {
+            const signedUrl = await createSignedBlobDownload(row.photo_blob_path, 3600); // 1시간 유효
+            photoUrl = signedUrl.url;
+          } catch (err) {
+            console.warn('[admin/records] Signed URL 생성 실패:', err.message);
+            // 기존 URL 사용
+          }
+        }
+      }
+      
+      return {
+        recordId: row.id,
+        server_time: row.server_time,
+        employee_id: row.employee_id,
+        name: row.name,
+        ip: row.ip,
+        file: photoUrl,
+        photo_blob_path: row.photo_blob_path,
+        photo_content_type: row.photo_content_type,
+        photo_size: row.photo_size,
+        photo_width: row.photo_width,
+        photo_height: row.photo_height,
+        office: row.office,
+        device_id: row.device_id,
+        image_hash: row.image_hash,
+        cleanup_scheduled_at: row.cleanup_scheduled_at,
+        photo_deleted_at: row.photo_deleted_at,
+        backup_blob_path: row.backup_blob_path,
+        backup_generated_at: row.backup_generated_at
+      };
     }));
 
     return res.status(200).json({ ok: true, records: mapped });
@@ -478,6 +497,17 @@ router.post('/delete-all-blobs', requireAdmin, async (req, res) => {
       message: 'Blob 삭제 처리 중 오류가 발생했습니다.',
       error: err.message
     });
+  }
+});
+
+// 스토리지 사용량 조회
+router.get('/storage-usage', requireAdmin, async (req, res) => {
+  try {
+    const usage = await getStorageUsage();
+    res.json({ ok: true, ...usage });
+  } catch (err) {
+    console.error('[admin] storage usage error:', err);
+    res.status(500).json({ ok: false, message: '사용량 조회 실패', error: err.message });
   }
 });
 
