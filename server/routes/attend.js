@@ -177,7 +177,9 @@ router.post('/register', async (req, res) => {
         forceExtension: '.webp',
         fallbackContentType: compressedInfo.contentType,
         prefix: 'attendance',
-        cacheControl: 'public, max-age=31536000, immutable'
+        cacheControl: 'public, max-age=31536000, immutable',
+        employeeId: employeeId,
+        name: name
       }
     );
 
