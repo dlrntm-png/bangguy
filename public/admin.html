@@ -31,6 +31,17 @@
     .status-pending { background: #fff3cd; color: #856404; }
     .status-approved { background: #d4edda; color: #155724; }
     .status-rejected { background: #f8d7da; color: #721c24; }
+    .pending-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #fef2f2;
+      color: #b91c1c;
+    }
     .loading { opacity: 0.6; pointer-events: none; }
     .photo-preview {
       width: auto;
@@ -83,6 +94,30 @@
     .filter-actions-left { display: flex; gap: 8px; }
     .filter-actions button { margin: 0; }
     .filter-hint { margin-top: 8px; font-size: 12px; color: #666; }
+    #recordActions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    #recordActions label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    #recordActions button {
+      font-size: 13px;
+      padding: 7px 14px;
+      white-space: nowrap;
+    }
+    #selectedCount {
+      color: #666;
+      font-size: 13px;
+      white-space: nowrap;
+    }
     details.section { margin: 20px 0; }
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
     details.section > summary::-webkit-details-marker { display: none; }
@@ -125,6 +160,10 @@
       .records-table td.name-cell { display: none; }
       .emp-inline-name { display: inline-block; font-size: 13px; color: #555; }
       .record-filter-row { flex-direction: column; align-items: stretch; }
+      #recordActions { gap: 8px; }
+      #recordActions label { font-size: 12px; }
+      #recordActions button { font-size: 12px; padding: 6px 10px; }
+      #selectedCount { font-size: 12px; }
       .filter-group { width: 100%; }
       .filter-actions { flex-direction: column; align-items: stretch; gap: 10px; }
       .filter-actions-left { width: 100%; gap: 6px; }
@@ -199,7 +238,7 @@
         </div>
       </div>
       <p class="filter-hint">사번 또는 기간을 선택한 뒤 조회 버튼을 눌러주세요. 기간은 일 / 월 중 한 가지 방식만 사용됩니다.</p>
-      <div id="recordActions" style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
+      <div id="recordActions">
         <label style="display: flex; align-items: center; gap: 6px;">
           <input type="checkbox" id="selectAllRecords" onchange="toggleAllRecords(this)" />
           전체 선택
@@ -211,23 +250,12 @@
       <div id="recordsTable" class="records-placeholder">조회 조건을 선택한 뒤 조회 버튼을 눌러주세요.</div>
     </div>
 
-    <!-- 기기 ID 업데이트 -->
-    <details class="section">
-      <summary><h3 style="display: inline;">기기 ID 업데이트</h3></summary>
-      <p>다른 기기에서 등록된 기록이 있는 경우, 새 기기 ID로 업데이트할 수 있습니다.</p>
-      <div>
-        <label>사번</label>
-        <input type="text" id="updateEmpId" placeholder="사번 입력" />
-        <label>새 기기 ID</label>
-        <input type="text" id="updateDeviceId" placeholder="새 기기 ID 입력" />
-        <button class="primary" onclick="updateDeviceId()">기기 ID 업데이트</button>
-      </div>
-      <div id="updateResult" class="hidden"></div>
-    </details>
-
     <!-- 기기 재등록 요청 관리 -->
-    <details class="section">
-      <summary><h3 style="display: inline;">기기 재등록 요청 관리</h3></summary>
+    <details class="section" id="deviceRequestsSection">
+      <summary>
+        <h3 style="display: inline;">기기 재등록 요청 관리</h3>
+        <span id="deviceRequestBadge" class="pending-pill hidden">대기 0건</span>
+      </summary>
       <div class="info-box">
         <strong>안내:</strong> 사용자가 기기 변경을 요청한 경우, 승인하면 해당 사번의 모든 등록 기록의 기기 ID가 업데이트됩니다.
       </div>
@@ -244,12 +272,30 @@
       </div>
       <div id="deviceRequestsTable"></div>
     </details>
+
+    <!-- 기기 ID 업데이트 -->
+    <details class="section">
+      <summary><h3 style="display: inline;">기기 ID 업데이트</h3></summary>
+      <p>다른 기기에서 등록된 기록이 있는 경우, 새 기기 ID로 업데이트할 수 있습니다.</p>
+      <div>
+        <label>사번</label>
+        <input type="text" id="updateEmpId" placeholder="사번 입력" />
+        <label>새 기기 ID</label>
+        <input type="text" id="updateDeviceId" placeholder="새 기기 ID 입력" />
+        <button class="primary" onclick="updateDeviceId()">기기 ID 업데이트</button>
+      </div>
+      <div id="updateResult" class="hidden"></div>
+    </details>
   </div>
 
   <script>
     let adminToken = localStorage.getItem('admin_token');
     let cachedRecords = [];
     const selectedRecordIds = new Set();
+    let pendingRequestCount = 0;
+    let pendingBadgeTimer = null;
+    const deviceRequestsSection = document.getElementById('deviceRequestsSection');
+    const deviceRequestBadge = document.getElementById('deviceRequestBadge');
     const dateFilterInput = document.getElementById('dateFilter');
     const monthFilterInput = document.getElementById('monthFilter');
     const periodStatus = document.getElementById('periodStatus');
@@ -311,6 +357,62 @@
     }
 
     updatePeriodStatus();
+
+    function updatePendingRequestBadge(count, options = {}) {
+      const { alertOnIncrease = false } = options;
+      if (!deviceRequestBadge) return;
+
+      if (count > 0) {
+        deviceRequestBadge.textContent = `대기 ${count}건`;
+        deviceRequestBadge.classList.remove('hidden');
+        if (alertOnIncrease && count > pendingRequestCount) {
+          showPendingRequestAlert(count);
+        }
+      } else {
+        deviceRequestBadge.classList.add('hidden');
+      }
+      pendingRequestCount = count;
+    }
+
+    async function refreshPendingRequestBadge(options = {}) {
+      if (!adminToken || !deviceRequestBadge) return;
+
+      try {
+        const res = await fetch('/api/admin/device-requests?status=pending', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.message || '조회 실패');
+
+        const count = Array.isArray(data.requests) ? data.requests.length : 0;
+        updatePendingRequestBadge(count, options);
+      } catch (err) {
+        console.error('pending request badge 업데이트 실패:', err);
+      }
+    }
+
+    function showPendingRequestAlert(count) {
+      if (deviceRequestsSection && !deviceRequestsSection.open) {
+        deviceRequestsSection.open = true;
+      }
+      alert(`📬 기기 재등록 요청이 ${count}건 대기 중입니다.`);
+    }
+
+    function startPendingRequestWatcher() {
+      if (pendingBadgeTimer) {
+        clearInterval(pendingBadgeTimer);
+      }
+      refreshPendingRequestBadge({ alertOnIncrease: false });
+      pendingBadgeTimer = setInterval(() => {
+        refreshPendingRequestBadge({ alertOnIncrease: true });
+      }, 60000);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshPendingRequestBadge({ alertOnIncrease: false });
+      }
+    });
 
     function confirmDownload(type) {
       if (type === 'csv') {
@@ -483,6 +585,7 @@
           resetSelectionState();
           setRecordsPlaceholder('조회 조건을 선택한 뒤 조회 버튼을 눌러주세요.');
           loadDeviceRequests();
+          startPendingRequestWatcher();
         } else {
           logout();
         }
@@ -519,6 +622,7 @@
           resetSelectionState();
           setRecordsPlaceholder('조회 조건을 선택한 뒤 조회 버튼을 눌러주세요.');
           loadDeviceRequests();
+          startPendingRequestWatcher();
         } else {
           errorDiv.textContent = data.message || '로그인 실패';
           errorDiv.classList.remove('hidden');
@@ -532,6 +636,14 @@
     function logout() {
       localStorage.removeItem('admin_token');
       adminToken = null;
+      if (pendingBadgeTimer) {
+        clearInterval(pendingBadgeTimer);
+        pendingBadgeTimer = null;
+      }
+      pendingRequestCount = 0;
+      if (deviceRequestBadge) {
+        deviceRequestBadge.classList.add('hidden');
+      }
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('adminPanel').classList.add('hidden');
       document.getElementById('adminPassword').value = '';
@@ -791,6 +903,11 @@
         
         if (data.ok) {
           displayDeviceRequests(data.requests);
+          if (status === 'pending') {
+            updatePendingRequestBadge(Array.isArray(data.requests) ? data.requests.length : 0, { alertOnIncrease: false });
+          } else {
+            await refreshPendingRequestBadge({ alertOnIncrease: false });
+          }
         } else {
           alert('요청 목록 조회 실패: ' + (data.message || '알 수 없는 오류'));
         }
