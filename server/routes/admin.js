@@ -15,7 +15,7 @@ import { deleteBlob } from '../../lib/blob.js';
 import { getDeviceRequests, getDeviceRequestById, completeDeviceRequest, updateDeviceId } from '../../lib/db.js';
 import { getRecordById, clearPhotoFields } from '../../lib/db.js';
 import { buildCsv } from '../../lib/csv.js';
-import { listBlobs, getStorageUsage, createSignedBlobDownload, getPublicUrl } from '../../lib/blob.js';
+import { listBlobs, getStorageUsage, createSignedBlobDownload, getPublicUrl, readBlobBuffer } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
 import { getAllowedIps, addAllowedIp, removeAllowedIp } from '../../lib/db.js';
 import { invalidateAllowedIpsCache, refreshAllowedIpsCache, getClientIp } from '../../lib/ip.js';
@@ -143,23 +143,17 @@ router.get('/records', requireAdmin, async (req, res) => {
     const mapped = await Promise.all(records.map(async (row) => {
       let photoUrl = row.photo_url;
       
-      // B2를 사용하고 pathname만 있는 경우 signed URL 생성
+      // B2를 사용하고 pathname만 있는 경우 프록시 URL 사용 (CORS 문제 해결)
       if (row.photo_blob_path && process.env.B2_ENDPOINT) {
         // Public URL이 있으면 우선 사용
         const publicUrl = getPublicUrl(row.photo_blob_path);
         if (publicUrl) {
           photoUrl = publicUrl;
         } else if (!photoUrl || photoUrl === row.photo_blob_path || !photoUrl.startsWith('http')) {
-          // Public URL이 없고 URL이 pathname 형식이거나 없으면 signed URL 생성
-          try {
-            // 7일 유효 signed URL 생성 (브라우저 캐시 활용, B2 제한 고려)
-            const signedUrl = await createSignedBlobDownload(row.photo_blob_path, 604800); // 7일 유효
-            photoUrl = signedUrl.url;
-          } catch (err) {
-            console.error('[admin/records] Signed URL 생성 실패:', err.message);
-            // 에러 발생 시 빈 문자열로 설정하여 이미지 로드 실패 처리
-            photoUrl = '';
-          }
+          // Public URL이 없으면 프록시 URL 사용 (CORS 문제 해결)
+          // pathname을 URL 인코딩하여 프록시 경로 생성
+          const encodedPath = encodeURIComponent(row.photo_blob_path);
+          photoUrl = `/api/admin/photo/${encodedPath}`;
         }
       }
       
@@ -624,6 +618,53 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ ok: false, message: err.message });
     }
     return res.status(500).json({ ok: false, message: 'IP 삭제에 실패했습니다.' });
+  }
+});
+
+// 사진 프록시 (CORS 문제 해결)
+router.get('/photo/*', requireAdmin, async (req, res) => {
+  // 경로에서 pathname 추출 (와일드카드 매칭)
+  let pathname = req.params[0];
+  
+  // URL 디코딩
+  if (pathname) {
+    try {
+      pathname = decodeURIComponent(pathname);
+    } catch (err) {
+      console.warn('[admin/photo] URL 디코딩 실패:', err.message);
+    }
+  }
+  
+  if (!pathname) {
+    return res.status(400).json({ ok: false, message: '파일 경로가 필요합니다.' });
+  }
+
+  try {
+    // Blob에서 이미지 읽기
+    const buffer = await readBlobBuffer(pathname);
+    
+    // Content-Type 결정
+    let contentType = 'image/webp';
+    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) {
+      contentType = 'image/jpeg';
+    } else if (pathname.endsWith('.png')) {
+      contentType = 'image/png';
+    } else if (pathname.endsWith('.gif')) {
+      contentType = 'image/gif';
+    }
+    
+    // CORS 헤더 설정 및 이미지 반환
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.send(buffer);
+  } catch (err) {
+    console.error('[admin] photo proxy error:', err);
+    if (err.code === 'BLOB_NOT_FOUND') {
+      return res.status(404).json({ ok: false, message: '파일을 찾을 수 없습니다.' });
+    }
+    return res.status(500).json({ ok: false, message: '이미지 로드 실패' });
   }
 });
 
