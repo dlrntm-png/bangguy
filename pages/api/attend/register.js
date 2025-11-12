@@ -134,7 +134,8 @@ export default async function handler(req, res) {
         });
       }
 
-      if (lastRecord.device_id && lastRecord.device_id !== deviceId) {
+      // 부하 테스트 모드에서는 기기 ID 체크 우회
+      if (!isLoadTest && lastRecord.device_id && lastRecord.device_id !== deviceId) {
         await safeRemoveTemp(actualPhoto.filepath);
         return res.status(200).json({
           ok: false,
@@ -147,17 +148,20 @@ export default async function handler(req, res) {
       }
     }
 
-    const duplicateHash = await findRecordByHash(imageHash);
-    if (duplicateHash) {
-      await safeRemoveTemp(actualPhoto.filepath);
-      return res.status(200).json({
-        ok: false,
-        reason: 'DUPLICATE_PHOTO',
-        message: '이미 사용된 사진입니다. 새로운 사진을 촬영해주세요.',
-        ip,
-        office,
-        serverTime
-      });
+    // 부하 테스트 모드에서는 이미지 중복 검사 우회
+    if (!isLoadTest) {
+      const duplicateHash = await findRecordByHash(imageHash);
+      if (duplicateHash) {
+        await safeRemoveTemp(actualPhoto.filepath);
+        return res.status(200).json({
+          ok: false,
+          reason: 'DUPLICATE_PHOTO',
+          message: '이미 사용된 사진입니다. 새로운 사진을 촬영해주세요.',
+          ip,
+          office,
+          serverTime
+        });
+      }
     }
 
     const { buffer: compressedBuffer, info: compressedInfo } = await compressImage(originalBuffer);
