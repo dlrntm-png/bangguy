@@ -308,6 +308,17 @@
       <div id="deviceRequestsTable"></div>
     </details>
 
+    <!-- 스토리지 사용량 -->
+    <details class="section" id="storageUsageSection">
+      <summary>
+        <h3 style="display: inline;">스토리지 사용량</h3>
+      </summary>
+      <div class="info-box">
+        <div id="storageUsageInfo">로딩 중...</div>
+        <button class="primary" onclick="loadStorageUsage()" style="margin-top: 10px;">새로고침</button>
+      </div>
+    </details>
+
     <!-- 허용된 IP 관리 -->
     <details class="section" id="allowedIpsSection">
       <summary>
@@ -1308,10 +1319,99 @@
       }
     }
 
-    // 페이지 로드 시 현재 IP 확인 및 IP 목록 로드
+    // ========== 스토리지 사용량 조회 ==========
+    async function loadStorageUsage() {
+      if (!adminToken) return;
+      const infoDiv = document.getElementById('storageUsageInfo');
+      infoDiv.innerHTML = '로딩 중...';
+      
+      try {
+        const res = await fetch('/api/admin/storage-usage', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          displayStorageUsage(data);
+        } else {
+          infoDiv.innerHTML = '<span style="color: #dc3545;">조회 실패: ' + (data.message || '알 수 없는 오류') + '</span>';
+        }
+      } catch (err) {
+        console.error('스토리지 사용량 조회 실패:', err);
+        infoDiv.innerHTML = '<span style="color: #dc3545;">조회 중 오류가 발생했습니다.</span>';
+      }
+    }
+
+    function displayStorageUsage(data) {
+      const infoDiv = document.getElementById('storageUsageInfo');
+      
+      // 스토리지 타입 확인
+      const storageType = data.storageType || 'unknown';
+      const isB2 = storageType === 'backblaze-b2';
+      const isFileSystem = storageType === 'file-system';
+      
+      let html = '<div style="line-height: 1.8;">';
+      
+      // 스토리지 타입 표시
+      html += `<div><strong>스토리지 타입:</strong> `;
+      if (isB2) {
+        html += '<span style="color: #28a745;">Backblaze B2</span>';
+      } else if (isFileSystem) {
+        html += '<span style="color: #666;">Render 파일 시스템</span>';
+      } else {
+        html += '<span style="color: #666;">' + storageType + '</span>';
+      }
+      html += '</div>';
+      
+      if (isB2) {
+        // B2 사용량 정보
+        const usedGB = data.currentUsageGB || 0;
+        const limitGB = data.limitGB || 10;
+        const usagePercent = data.usagePercent || 0;
+        const remainingGB = data.remainingGB || 0;
+        
+        // 경고 색상 결정
+        let usageColor = '#28a745'; // 초록
+        if (usagePercent >= 80) {
+          usageColor = '#dc3545'; // 빨강 (80% 이상)
+        } else if (usagePercent >= 60) {
+          usageColor = '#ffc107'; // 노랑 (60% 이상)
+        }
+        
+        html += `<div><strong>사용량:</strong> <span style="color: ${usageColor}; font-weight: bold;">${usedGB.toFixed(2)} GB</span> / ${limitGB} GB (${usagePercent.toFixed(1)}%)</div>`;
+        html += `<div><strong>남은 용량:</strong> ${remainingGB.toFixed(2)} GB</div>`;
+        html += `<div style="margin-top: 10px;">`;
+        html += `<div style="background: #e9ecef; border-radius: 4px; height: 24px; position: relative; overflow: hidden;">`;
+        html += `<div style="background: ${usageColor}; height: 100%; width: ${Math.min(usagePercent, 100)}%; transition: width 0.3s;"></div>`;
+        html += `</div></div>`;
+        
+        if (data.isWarning || usagePercent >= 80) {
+          html += `<div style="margin-top: 10px; padding: 8px; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px; color: #721c24;">`;
+          html += `<strong>⚠️ 경고:</strong> 스토리지 사용량이 80%를 초과했습니다. 파일을 정리하거나 백업을 생성해주세요.`;
+          html += `</div>`;
+        } else if (usagePercent >= 60) {
+          html += `<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; color: #856404;">`;
+          html += `<strong>💡 알림:</strong> 스토리지 사용량이 60%를 초과했습니다.`;
+          html += `</div>`;
+        }
+      } else if (isFileSystem) {
+        html += `<div style="color: #666; margin-top: 10px;">`;
+        html += `Render 파일 시스템을 사용 중입니다. 사용량 통계는 제공되지 않습니다.`;
+        html += `</div>`;
+      } else {
+        html += `<div style="color: #666; margin-top: 10px;">`;
+        html += `스토리지 정보를 가져올 수 없습니다.`;
+        html += `</div>`;
+      }
+      
+      html += '</div>';
+      infoDiv.innerHTML = html;
+    }
+
+    // 페이지 로드 시 현재 IP 확인 및 IP 목록 로드, 스토리지 사용량 조회
     if (adminToken) {
       loadCurrentIp();
       loadAllowedIps();
+      loadStorageUsage();
     }
   </script>
 </body>
