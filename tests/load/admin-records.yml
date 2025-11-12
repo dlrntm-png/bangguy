@@ -1,0 +1,23 @@
+config:
+  target: "{{ $processEnvironment.BASE_URL }}"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: warmup
+    - duration: 120
+      arrivalRate: 15
+      name: sustained
+  defaults:
+    headers:
+      Authorization: "Bearer {{ $processEnvironment.ADMIN_TOKEN }}"
+      User-Agent: bangguy-loadtest
+  processor: "./processor.js"
+
+scenarios:
+  - name: admin-records
+    flow:
+      - function: setupAdminQuery
+      - get:
+          url: "/api/admin/records?month={{ queryMonth }}"
+      - think: 3
+

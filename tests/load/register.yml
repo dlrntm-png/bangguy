@@ -1,0 +1,37 @@
+config:
+  target: "{{ $processEnvironment.BASE_URL }}"
+  phases:
+    - duration: 120
+      arrivalRate: 10
+      name: ramp-up
+    - duration: 180
+      arrivalRate: 20
+      name: sustained
+    - duration: 60
+      arrivalRate: 30
+      name: stress
+  defaults:
+    headers:
+      User-Agent: bangguy-loadtest
+      X-Load-Test: "true"
+  processor: "./processor.js"
+  plugins:
+    expect: {}
+
+scenarios:
+  - name: attend-register
+    flow:
+      - function: setupRegisterRequest
+      - post:
+          url: "/api/attend/register"
+          formData:
+            employeeId: "{{ employeeId }}"
+            name: "{{ employeeName }}"
+            deviceId: "{{ deviceId }}"
+            photo:
+              value: "{{ photoPath }}"
+              options:
+                filename: "loadtest-photo.jpg"
+                contentType: "image/jpeg"
+      - think: 1
+

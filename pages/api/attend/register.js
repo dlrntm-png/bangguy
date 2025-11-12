@@ -99,7 +99,10 @@ export default async function handler(req, res) {
     const originalBuffer = await fs.readFile(actualPhoto.filepath);
     const imageHash = md5(originalBuffer);
 
-    if (!office) {
+    // 부하 테스트 모드: X-Load-Test 헤더가 있고 환경 변수가 설정되어 있으면 IP 체크 우회
+    const isLoadTest = req.headers['x-load-test'] === 'true' && process.env.ALLOW_LOAD_TEST === 'true';
+    
+    if (!office && !isLoadTest) {
       await safeRemoveTemp(actualPhoto.filepath);
       return res.status(200).json({
         ok: false,
