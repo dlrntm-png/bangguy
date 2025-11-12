@@ -629,10 +629,20 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 // 인증 없이 접근 가능하지만, pathname이 attendance/로 시작하는지 검증
 // Express 와일드카드 라우팅: 모든 경로를 매칭하도록 설정
 router.get('/photo/*', async (req, res) => {
-  // req.url에서 전체 경로 추출
-  // 예: /api/admin/photo/attendance/xxx.webp -> attendance/xxx.webp
-  let fullPath = req.url.split('?')[0]; // 쿼리 스트링 제거
-  let pathname = fullPath.replace(/^\/api\/admin\/photo\/?/, ''); // /api/admin/photo/ 제거
+  // Express 라우터에서 req.path는 라우트 기준 경로입니다
+  // 예: /photo/attendance/xxx.webp
+  // req.originalUrl은 전체 원본 URL입니다: /api/admin/photo/attendance/xxx.webp
+  let pathname = req.path; // 라우터 기준 경로: /photo/attendance/xxx.webp
+  
+  // /photo/ 접두사 제거
+  if (pathname.startsWith('/photo/')) {
+    pathname = pathname.substring('/photo/'.length);
+  } else if (pathname.startsWith('/photo')) {
+    pathname = pathname.substring('/photo'.length);
+  }
+  
+  // 앞의 슬래시 제거
+  pathname = pathname.replace(/^\/+/, '');
   
   // URL 디코딩
   if (pathname) {
@@ -645,19 +655,18 @@ router.get('/photo/*', async (req, res) => {
   }
   
   if (!pathname) {
-    console.error(`[admin/photo] 경로 없음 - req.url: ${req.url}, req.path: ${req.path}, req.params:`, req.params);
+    console.error(`[admin/photo] 경로 없음 - req.url: ${req.url}, req.path: ${req.path}, req.originalUrl: ${req.originalUrl}`);
     return res.status(400).json({ ok: false, message: '파일 경로가 필요합니다.' });
   }
 
   // 보안: attendance/로 시작하는 파일만 허용
-  const normalizedPath = pathname.replace(/^\/+/, ''); // 앞의 슬래시 제거
-  if (!normalizedPath.startsWith('attendance/')) {
-    console.warn(`[admin/photo] 접근 거부: ${pathname} (정규화: ${normalizedPath})`);
+  if (!pathname.startsWith('attendance/')) {
+    console.warn(`[admin/photo] 접근 거부: ${pathname}`);
     return res.status(403).json({ ok: false, message: '접근 권한이 없습니다.' });
   }
   
-  // 정규화된 경로 사용
-  const finalPathname = normalizedPath;
+  // 최종 경로 사용
+  const finalPathname = pathname;
   console.log(`[admin/photo] 요청 성공: ${finalPathname}`);
 
   try {
