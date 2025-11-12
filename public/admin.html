@@ -34,7 +34,7 @@
     .loading { opacity: 0.6; pointer-events: none; }
     .photo-preview {
       width: auto;
-      height: 72px;
+      height: 32px;
       max-width: 100%;
       border: 1px solid #d4d4d8;
       border-radius: 6px;
@@ -57,8 +57,6 @@
     .section-header-actions button { padding: 6px 10px; font-size: 12px; white-space: nowrap; min-width: 120px; cursor: pointer; }
     .records-table table { width: 100%; border-collapse: collapse; }
     .records-table td { vertical-align: middle; }
-    .status-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-    .status-time { font-size: 12px; color: #666; }
     .record-filter-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; align-items: flex-end; }
     .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
     .filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin-top: 12px; }
@@ -66,18 +64,18 @@
     .filters .filter-id { flex: 1 1 220px; }
     .filters .filter-period { flex: 1 1 320px; }
     .filters .filter-label { font-weight: 700; color: #1e293b; font-size: 13px; letter-spacing: -0.01em; }
-    .input-card { background: linear-gradient(145deg, #ecfeff, #cffafe); border: 1px solid #bae6fd; border-radius: 16px; padding: 16px 18px; box-shadow: 0 10px 22px rgba(14, 165, 233, 0.12); display: flex; flex-direction: column; gap: 6px; }
+    .input-card { background: linear-gradient(145deg, #ecfeff, #cffafe); border: 1px solid #bae6fd; border-radius: 16px; padding: 16px 18px; box-shadow: 0 10px 22px rgba(14, 165, 233, 0.12); display: flex; flex-direction: column; gap: 10px; min-height: 118px; justify-content: center; }
     .input-card input[type="text"] { width: 100%; padding: 11px 12px; border: 1px solid #bae6fd; border-radius: 10px; background: rgba(255,255,255,0.92); font-size: 14px; font-weight: 500; color: #0f172a; transition: border 0.12s ease, box-shadow 0.12s ease; }
     .input-card input[type="text"]::placeholder { color: #94a3b8; }
     .input-card input[type="text"]:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.2); background: #fff; }
-    .period-card { background: linear-gradient(145deg, #eef2ff, #e2e8ff); border: 1px solid #c7d2fe; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.12); }
+    .period-card { background: linear-gradient(145deg, #eef2ff, #e2e8ff); border: 1px solid #c7d2fe; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.12); min-height: 118px; justify-content: center; }
     .period-status { margin: 0; font-size: 13px; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .period-status span { font-size: 12px; color: #475569; font-weight: 500; }
     .period-status.has-value { color: #0f172a; }
     .period-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
-    .period-field { flex: 1 1 150px; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; border: 1px solid #c7d2fe; background: rgba(255, 255, 255, 0.9); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.08); }
+    .period-field { flex: 1 1 150px; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid #c7d2fe; background: rgba(255, 255, 255, 0.9); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.08); }
     .period-field label { font-size: 12px; font-weight: 600; color: #312e81; letter-spacing: 0.01em; }
-    .period-field input { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: 600; color: #1d4ed8; padding: 0; height: 26px; }
+    .period-field input { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: 600; color: #1d4ed8; padding: 0; height: 24px; }
     .period-field input:focus { outline: none; }
     .period-field input::-webkit-calendar-picker-indicator { filter: invert(21%) sepia(94%) saturate(3396%) hue-rotate(221deg) brightness(95%) contrast(97%); cursor: pointer; }
     .period-clear { flex: 0 0 auto; border: none; background: rgba(15, 23, 42, 0.07); color: #1f2937; padding: 9px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.12s ease; }
@@ -120,16 +118,14 @@
       .records-table td.emp-cell { grid-area: emp; }
       .records-table td.name-cell { grid-area: name; }
       .records-table td.photo-cell { grid-area: photo; text-align: center; }
-      .photo-preview { height: 64px; }
+      .photo-preview { height: 48px; }
       .section-header { flex-direction: row; align-items: center; }
       .section-header h3 { font-size: 18px; }
       .section-header-actions { gap: 6px; font-size: 11px; }
       .section-header-actions button { padding: 6px 8px; font-size: 11px; min-width: 0; }
       .records-table td.name-cell { display: none; }
       .emp-inline-name { display: inline-block; font-size: 13px; color: #555; }
-      .records-table td.status-cell { display: none; }
       .status-inline { display: inline-block; font-size: 11px; color: #888; margin-left: 6px; }
-      .status-wrapper { gap: 4px; }
       .record-filter-row { flex-direction: column; align-items: stretch; }
       .filter-group { width: 100%; }
       .filter-actions { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -620,7 +616,7 @@
         }
       };
 
-      let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>사진</th><th>상태 / 작업</th></tr></thead><tbody>';
+      let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>사진</th></tr></thead><tbody>';
       records.forEach(record => {
         const imageUrl = record.file || '';
         const hasImage = Boolean(imageUrl);
@@ -629,9 +625,6 @@
           : record.cleanup_scheduled_at
             ? `삭제 예정 ${formatTime(record.cleanup_scheduled_at, true)}`
             : '보관 중';
-        const statusBadge = record.photo_deleted_at
-          ? '<span class="status-badge status-rejected">삭제됨</span>'
-          : '';
         const statusInline = cleanupTime ? `<span class="status-inline">${cleanupTime}</span>` : '';
         const safeNameAttr = (record.name || '-').replace(/"/g, '&quot;');
         html += `<tr>
@@ -652,12 +645,6 @@
                      onclick="showImageModal('${imageUrl}', '사진 미리보기')" />
               </div>
             ` : '<span style="color: #999;">-</span>'}
-          </td>
-          <td class="status-cell">
-            <div class="status-wrapper">
-              ${statusBadge || ''}
-              <span class="status-time">${cleanupTime}</span>
-            </div>
           </td>
         </tr>`;
       });
