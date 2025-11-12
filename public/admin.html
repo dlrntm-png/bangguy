@@ -42,6 +42,41 @@
       background: #fef2f2;
       color: #b91c1c;
     }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.6);
+      z-index: 2000;
+      padding: 24px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-dialog {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 24px 28px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+      text-align: center;
+    }
+    .modal-dialog h3 { margin: 0 0 12px; font-size: 20px; color: #0f172a; }
+    .modal-dialog p { margin: 0; font-size: 14px; color: #475569; line-height: 1.5; }
+    .modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+    .modal-actions button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .modal-actions button.secondary {
+      background: #e2e8f0;
+      color: #1f2937;
+    }
     .loading { opacity: 0.6; pointer-events: none; }
     .photo-preview {
       width: auto;
@@ -288,14 +323,30 @@
     </details>
   </div>
 
+  <div id="pendingModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pendingModalTitle">
+    <div class="modal-dialog">
+      <h3 id="pendingModalTitle">기기 재등록 요청 알림</h3>
+      <p id="pendingModalMessage">기기 재등록 요청이 대기 중입니다.</p>
+      <div class="modal-actions">
+        <button id="pendingModalViewBtn" class="primary">요청 확인</button>
+        <button id="pendingModalCloseBtn" class="secondary">나중에 보기</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let adminToken = localStorage.getItem('admin_token');
     let cachedRecords = [];
     const selectedRecordIds = new Set();
     let pendingRequestCount = 0;
     let pendingBadgeTimer = null;
+    let pendingModalShown = false;
     const deviceRequestsSection = document.getElementById('deviceRequestsSection');
     const deviceRequestBadge = document.getElementById('deviceRequestBadge');
+    const pendingModal = document.getElementById('pendingModal');
+    const pendingModalMessage = document.getElementById('pendingModalMessage');
+    const pendingModalViewBtn = document.getElementById('pendingModalViewBtn');
+    const pendingModalCloseBtn = document.getElementById('pendingModalCloseBtn');
     const dateFilterInput = document.getElementById('dateFilter');
     const monthFilterInput = document.getElementById('monthFilter');
     const periodStatus = document.getElementById('periodStatus');
@@ -358,18 +409,65 @@
 
     updatePeriodStatus();
 
+    function showPendingRequestModal(count) {
+      if (!pendingModal || !pendingModalMessage) return;
+      const message =
+        count === 1
+          ? '기기 재등록 요청이 1건 대기 중입니다.'
+          : `기기 재등록 요청이 ${count}건 대기 중입니다.`;
+      pendingModalMessage.textContent = message;
+      pendingModal.classList.add('show');
+      pendingModalShown = true;
+      if (pendingModalViewBtn) {
+        pendingModalViewBtn.focus();
+      }
+    }
+
+    function hidePendingRequestModal() {
+      if (!pendingModal) return;
+      pendingModal.classList.remove('show');
+    }
+
+    if (pendingModalViewBtn) {
+      pendingModalViewBtn.addEventListener('click', () => {
+        hidePendingRequestModal();
+        if (deviceRequestsSection && !deviceRequestsSection.open) {
+          deviceRequestsSection.open = true;
+        }
+        loadDeviceRequests();
+      });
+    }
+
+    if (pendingModalCloseBtn) {
+      pendingModalCloseBtn.addEventListener('click', () => {
+        hidePendingRequestModal();
+      });
+    }
+
+    if (pendingModal) {
+      pendingModal.addEventListener('click', (event) => {
+        if (event.target === pendingModal) {
+          hidePendingRequestModal();
+        }
+      });
+    }
+
     function updatePendingRequestBadge(count, options = {}) {
-      const { alertOnIncrease = false } = options;
+      const { alertOnIncrease = false, forceModal = false } = options;
       if (!deviceRequestBadge) return;
 
       if (count > 0) {
         deviceRequestBadge.textContent = `대기 ${count}건`;
         deviceRequestBadge.classList.remove('hidden');
         if (alertOnIncrease && count > pendingRequestCount) {
-          showPendingRequestAlert(count);
+          showPendingRequestModal(count);
+        } else if (forceModal && !pendingModalShown) {
+          showPendingRequestModal(count);
         }
       } else {
         deviceRequestBadge.classList.add('hidden');
+        hidePendingRequestModal();
+        pendingModalShown = false;
       }
       pendingRequestCount = count;
     }
@@ -391,18 +489,11 @@
       }
     }
 
-    function showPendingRequestAlert(count) {
-      if (deviceRequestsSection && !deviceRequestsSection.open) {
-        deviceRequestsSection.open = true;
-      }
-      alert(`📬 기기 재등록 요청이 ${count}건 대기 중입니다.`);
-    }
-
     function startPendingRequestWatcher() {
       if (pendingBadgeTimer) {
         clearInterval(pendingBadgeTimer);
       }
-      refreshPendingRequestBadge({ alertOnIncrease: false });
+      refreshPendingRequestBadge({ forceModal: true });
       pendingBadgeTimer = setInterval(() => {
         refreshPendingRequestBadge({ alertOnIncrease: true });
       }, 60000);
@@ -410,7 +501,7 @@
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        refreshPendingRequestBadge({ alertOnIncrease: false });
+        refreshPendingRequestBadge({ alertOnIncrease: true });
       }
     });
 
@@ -641,9 +732,9 @@
         pendingBadgeTimer = null;
       }
       pendingRequestCount = 0;
-      if (deviceRequestBadge) {
-        deviceRequestBadge.classList.add('hidden');
-      }
+      pendingModalShown = false;
+      if (deviceRequestBadge) deviceRequestBadge.classList.add('hidden');
+      hidePendingRequestModal();
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('adminPanel').classList.add('hidden');
       document.getElementById('adminPassword').value = '';
