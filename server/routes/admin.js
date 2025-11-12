@@ -17,6 +17,8 @@ import { getRecordById, clearPhotoFields } from '../../lib/db.js';
 import { buildCsv } from '../../lib/csv.js';
 import { listBlobs, getStorageUsage, createSignedBlobDownload } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
+import { getAllowedIps, addAllowedIp, removeAllowedIp } from '../../lib/db.js';
+import { invalidateAllowedIpsCache, getClientIp } from '../../lib/ip.js';
 
 const router = express.Router();
 
@@ -553,6 +555,65 @@ router.get('/download-consent-logs', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('[admin] download consent logs error:', err);
     return res.status(500).json({ ok: false, message: '동의 로그 다운로드에 실패했습니다.' });
+  }
+});
+
+// 현재 IP 확인
+router.get('/my-ip', requireAdmin, (req, res) => {
+  const ip = getClientIp(req);
+  res.status(200).json({ ok: true, ip });
+});
+
+// 허용된 IP 목록 조회
+router.get('/allowed-ips', requireAdmin, async (req, res) => {
+  try {
+    const ips = await getAllowedIps();
+    return res.status(200).json({ ok: true, ips });
+  } catch (err) {
+    console.error('[admin] get allowed ips error:', err);
+    return res.status(500).json({ ok: false, message: 'IP 목록 조회에 실패했습니다.' });
+  }
+});
+
+// IP 추가
+router.post('/allowed-ips', requireAdmin, async (req, res) => {
+  const { ip_cidr, description } = req.body || {};
+
+  if (!ip_cidr || typeof ip_cidr !== 'string' || !ip_cidr.trim()) {
+    return res.status(400).json({ ok: false, message: 'IP/CIDR를 입력해주세요.' });
+  }
+
+  try {
+    const ip = await addAllowedIp(ip_cidr.trim(), description || null, 'admin');
+    invalidateAllowedIpsCache(); // 캐시 무효화
+    return res.status(200).json({ ok: true, ip, message: 'IP가 추가되었습니다.' });
+  } catch (err) {
+    console.error('[admin] add allowed ip error:', err);
+    if (err.message.includes('이미 등록된')) {
+      return res.status(409).json({ ok: false, message: err.message });
+    }
+    return res.status(500).json({ ok: false, message: 'IP 추가에 실패했습니다.' });
+  }
+});
+
+// IP 삭제
+router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+
+  if (isNaN(id) || id <= 0) {
+    return res.status(400).json({ ok: false, message: '유효하지 않은 ID입니다.' });
+  }
+
+  try {
+    await removeAllowedIp(id);
+    invalidateAllowedIpsCache(); // 캐시 무효화
+    return res.status(200).json({ ok: true, message: 'IP가 삭제되었습니다.' });
+  } catch (err) {
+    console.error('[admin] remove allowed ip error:', err);
+    if (err.message.includes('찾을 수 없습니다')) {
+      return res.status(404).json({ ok: false, message: err.message });
+    }
+    return res.status(500).json({ ok: false, message: 'IP 삭제에 실패했습니다.' });
   }
 });
 
