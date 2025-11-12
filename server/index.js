@@ -13,6 +13,7 @@ import attendRoutes from './routes/attend.js';
 import adminRoutes from './routes/admin.js';
 import consentRoutes from './routes/consent.js';
 import ipStatusRoute from './routes/ip-status.js';
+import healthRoute from './routes/health.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,9 @@ app.use('/storage', express.static(storagePath));
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end(); // No Content
 });
+
+// Health check (가장 먼저 등록 - DB 연결 없이 즉시 응답)
+app.use('/health', healthRoute);
 
 // API 라우트
 app.use('/api/ip-status', ipStatusRoute);
