@@ -34,6 +34,10 @@ app.use(express.urlencoded({ extended: true }));
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
+// 스토리지 파일 서빙 (storage 폴더 - 업로드된 이미지)
+const storagePath = path.join(__dirname, '..', 'storage');
+app.use('/storage', express.static(storagePath));
+
 // favicon.ico 요청 조용히 처리 (404 에러 방지)
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end(); // No Content

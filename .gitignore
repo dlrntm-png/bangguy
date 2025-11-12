@@ -1,52 +1,36 @@
 # Dependencies
 node_modules/
-# package-lock.json should be committed for consistency
+/.pnp
+.pnp.js
 
-# Environment variables
-.env
-.env.local
-.env.*.local
+# Testing
+/coverage
 
-# Logs
-server/logs/
-*.log
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Uploaded files
-server/uploads/
-public/mock-uploads/
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.pdf
+# Local env files
+.env*.local
+.env
 
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# Build outputs (if any)
-dist/
-build/
-.next/
-
-# Coverage reports
-coverage/
-.nyc_output/
-
+# Vercel
 .vercel
+
+# Mock uploads (로컬 개발용)
+public/mock-uploads/
+
+# Storage (프로덕션 파일 저장)
+storage/

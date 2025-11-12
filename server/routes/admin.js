@@ -12,9 +12,8 @@ import {
   deleteAllRecords
 } from '../../lib/db.js';
 import { deleteBlob } from '../../lib/blob.js';
-import { getDeviceRequests, getDeviceRequestById, completeDeviceRequest } from '../../lib/db.js';
+import { getDeviceRequests, getDeviceRequestById, completeDeviceRequest, updateDeviceId } from '../../lib/db.js';
 import { getRecordById, clearPhotoFields } from '../../lib/db.js';
-import { updateDeviceId } from '../../lib/db.js';
 import { buildCsv } from '../../lib/csv.js';
 import { listBlobs } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
