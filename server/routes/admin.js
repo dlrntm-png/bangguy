@@ -15,7 +15,7 @@ import { deleteBlob } from '../../lib/blob.js';
 import { getDeviceRequests, getDeviceRequestById, completeDeviceRequest, updateDeviceId } from '../../lib/db.js';
 import { getRecordById, clearPhotoFields } from '../../lib/db.js';
 import { buildCsv } from '../../lib/csv.js';
-import { listBlobs, getStorageUsage, createSignedBlobDownload } from '../../lib/blob.js';
+import { listBlobs, getStorageUsage, createSignedBlobDownload, getPublicUrl } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
 import { getAllowedIps, addAllowedIp, removeAllowedIp } from '../../lib/db.js';
 import { invalidateAllowedIpsCache, refreshAllowedIpsCache, getClientIp } from '../../lib/ip.js';
@@ -145,15 +145,20 @@ router.get('/records', requireAdmin, async (req, res) => {
       
       // B2를 사용하고 pathname만 있는 경우 signed URL 생성
       if (row.photo_blob_path && process.env.B2_ENDPOINT) {
-        // URL이 pathname 형식이거나 없으면 signed URL 생성
-        if (!photoUrl || photoUrl === row.photo_blob_path || !photoUrl.startsWith('http')) {
+        // Public URL이 있으면 우선 사용
+        const publicUrl = getPublicUrl(row.photo_blob_path);
+        if (publicUrl) {
+          photoUrl = publicUrl;
+        } else if (!photoUrl || photoUrl === row.photo_blob_path || !photoUrl.startsWith('http')) {
+          // Public URL이 없고 URL이 pathname 형식이거나 없으면 signed URL 생성
           try {
-            // 1년 유효 signed URL 생성 (브라우저 캐시 최대 활용)
-            const signedUrl = await createSignedBlobDownload(row.photo_blob_path, 31536000); // 1년 유효
+            // 7일 유효 signed URL 생성 (브라우저 캐시 활용, B2 제한 고려)
+            const signedUrl = await createSignedBlobDownload(row.photo_blob_path, 604800); // 7일 유효
             photoUrl = signedUrl.url;
           } catch (err) {
-            console.warn('[admin/records] Signed URL 생성 실패:', err.message);
-            // 기존 URL 사용
+            console.error('[admin/records] Signed URL 생성 실패:', err.message);
+            // 에러 발생 시 빈 문자열로 설정하여 이미지 로드 실패 처리
+            photoUrl = '';
           }
         }
       }
