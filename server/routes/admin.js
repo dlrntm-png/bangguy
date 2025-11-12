@@ -151,10 +151,8 @@ router.get('/records', requireAdmin, async (req, res) => {
           photoUrl = publicUrl;
         } else {
           // Public URL이 없으면 항상 프록시 URL 사용 (signed URL 무시)
-          // pathname을 URL 인코딩하여 프록시 경로 생성
-          // 슬래시도 인코딩되어야 함
-          const encodedPath = encodeURIComponent(row.photo_blob_path).replace(/%2F/g, '/');
-          photoUrl = `/api/admin/photo/${encodedPath}`;
+          // pathname을 그대로 사용 (슬래시는 그대로 유지)
+          photoUrl = `/api/admin/photo/${row.photo_blob_path}`;
         }
       } else if (row.photo_blob_path) {
         // 파일 시스템 사용 시 상대 경로로 변환
@@ -630,9 +628,10 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 // 사진 프록시 (CORS 문제 해결)
 // 인증 없이 접근 가능하지만, pathname이 attendance/로 시작하는지 검증
 router.get('/photo/*', async (req, res) => {
-  // 경로에서 pathname 추출 (와일드카드 매칭)
-  // req.path에서 /api/admin/photo/ 부분을 제거
-  let pathname = req.path.replace(/^\/api\/admin\/photo\//, '');
+  // 경로에서 pathname 추출
+  // req.url에서 쿼리 스트링 제거 후 경로 추출
+  let fullPath = req.url.split('?')[0]; // 쿼리 스트링 제거
+  let pathname = fullPath.replace(/^\/api\/admin\/photo\//, '');
   
   // URL 디코딩
   if (pathname) {
@@ -645,28 +644,32 @@ router.get('/photo/*', async (req, res) => {
   }
   
   if (!pathname) {
+    console.error(`[admin/photo] 경로 없음 - req.url: ${req.url}, req.path: ${req.path}`);
     return res.status(400).json({ ok: false, message: '파일 경로가 필요합니다.' });
   }
 
   // 보안: attendance/로 시작하는 파일만 허용
-  if (!pathname.startsWith('attendance/')) {
-    console.warn(`[admin/photo] 접근 거부: ${pathname}`);
+  const normalizedPath = pathname.replace(/^\/+/, ''); // 앞의 슬래시 제거
+  if (!normalizedPath.startsWith('attendance/')) {
+    console.warn(`[admin/photo] 접근 거부: ${pathname} (정규화: ${normalizedPath})`);
     return res.status(403).json({ ok: false, message: '접근 권한이 없습니다.' });
   }
   
-  console.log(`[admin/photo] 요청: ${pathname}`);
+  // 정규화된 경로 사용
+  const finalPathname = normalizedPath;
+  console.log(`[admin/photo] 요청: ${finalPathname}`);
 
   try {
     // Blob에서 이미지 읽기
-    const buffer = await readBlobBuffer(pathname);
+    const buffer = await readBlobBuffer(finalPathname);
     
     // Content-Type 결정
     let contentType = 'image/webp';
-    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) {
+    if (finalPathname.endsWith('.jpg') || finalPathname.endsWith('.jpeg')) {
       contentType = 'image/jpeg';
-    } else if (pathname.endsWith('.png')) {
+    } else if (finalPathname.endsWith('.png')) {
       contentType = 'image/png';
-    } else if (pathname.endsWith('.gif')) {
+    } else if (finalPathname.endsWith('.gif')) {
       contentType = 'image/gif';
     }
     
