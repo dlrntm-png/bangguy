@@ -12,10 +12,9 @@ import {
   deleteAllRecords
 } from '../../lib/db.js';
 import { deleteBlob } from '../../lib/blob.js';
-import { getDeviceRequests } from '../../lib/db.js';
+import { getDeviceRequests, getDeviceRequestById, completeDeviceRequest } from '../../lib/db.js';
 import { getRecordById, clearPhotoFields } from '../../lib/db.js';
 import { updateDeviceId } from '../../lib/db.js';
-import { approveDeviceRequest, rejectDeviceRequest } from '../../lib/db.js';
 import { buildCsv } from '../../lib/csv.js';
 import { listBlobs } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
@@ -316,8 +315,18 @@ router.post('/approve-device-request', requireAdmin, async (req, res) => {
   }
 
   try {
-    await approveDeviceRequest(requestId);
-    return res.status(200).json({ ok: true, message: '요청이 승인되었습니다.' });
+    const request = await getDeviceRequestById(requestId);
+    if (!request) {
+      return res.status(404).json({ ok: false, message: '요청을 찾을 수 없습니다.' });
+    }
+    if (request.status !== 'pending') {
+      return res.status(400).json({ ok: false, message: '이미 처리된 요청입니다.' });
+    }
+
+    const updated = await updateDeviceId(request.employee_id, request.device_id);
+    await completeDeviceRequest(requestId, 'approved');
+
+    return res.status(200).json({ ok: true, updated, message: '요청이 승인되었습니다.' });
   } catch (err) {
     console.error('approve-device-request error:', err);
     return res.status(500).json({ ok: false, message: '승인 처리 실패' });
@@ -332,7 +341,15 @@ router.post('/reject-device-request', requireAdmin, async (req, res) => {
   }
 
   try {
-    await rejectDeviceRequest(requestId);
+    const request = await getDeviceRequestById(requestId);
+    if (!request) {
+      return res.status(404).json({ ok: false, message: '요청을 찾을 수 없습니다.' });
+    }
+    if (request.status !== 'pending') {
+      return res.status(400).json({ ok: false, message: '이미 처리된 요청입니다.' });
+    }
+
+    await completeDeviceRequest(requestId, 'rejected');
     return res.status(200).json({ ok: true, message: '요청이 거부되었습니다.' });
   } catch (err) {
     console.error('reject-device-request error:', err);
