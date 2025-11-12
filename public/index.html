@@ -27,7 +27,18 @@
     input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     #result { min-height: 24px; font-size: 14px; color: #0f172a; }
     .photo-preview { margin-top: 12px; display: none; }
-    .photo-preview img { width: 100%; max-width: 220px; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .photo-preview img {
+      width: auto;
+      height: 32px;
+      max-width: 100%;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      object-fit: contain;
+      object-position: center;
+      background: #fff;
+      image-orientation: from-image;
+      padding: 4px;
+    }
     .photo-preview button { margin-top: 6px; padding: 6px 10px; font-size: 12px; background: #dc2626; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
     .photo-preview button:hover { background: #b91c1c; }
     .hidden { display: none !important; }
@@ -66,7 +77,11 @@
     .modal-close-btn { padding: 10px 20px; border-radius: 6px; border: none; background: #007bff; color: #fff; cursor: pointer; font-size: 15px; }
     .modal-close-btn:hover { background: #0056b3; }
     @keyframes popIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    @media (max-width: 420px) { .card { padding: 24px 18px; border-radius: 14px; } .card h2 { font-size: 22px; } }
+    @media (max-width: 420px) {
+      .card { padding: 24px 18px; border-radius: 14px; }
+      .card h2 { font-size: 22px; }
+      .photo-preview img { height: 48px; }
+    }
   </style>
   <script>
     let lastFocusedElement = null;
