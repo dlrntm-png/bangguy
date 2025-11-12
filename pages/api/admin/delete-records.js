@@ -47,9 +47,43 @@ export default async function handler(req, res) {
         .filter(Boolean);
     }
 
-    await Promise.all(blobPaths.map((path) => deleteBlob(path).catch(() => null)));
+    // 대량 삭제 시 배치 처리로 타임아웃 방지
+    const BATCH_SIZE = 50;
+    let deletedFiles = 0;
+    let failedFiles = 0;
 
-    return res.status(200).json({ ok: true, deleted, deletedFiles: blobPaths.length });
+    if (blobPaths.length > 0) {
+      for (let i = 0; i < blobPaths.length; i += BATCH_SIZE) {
+        const batch = blobPaths.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map((path) => deleteBlob(path).catch((err) => {
+            console.warn(`[delete-records] Blob 삭제 실패: ${path}`, err?.message);
+            throw err;
+          }))
+        );
+        
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            deletedFiles++;
+          } else {
+            failedFiles++;
+          }
+        });
+
+        // 배치 간 짧은 대기 (API 제한 방지)
+        if (i + BATCH_SIZE < blobPaths.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      deleted,
+      deletedFiles,
+      failedFiles,
+      message: `${deleted}건의 기록과 ${deletedFiles}개의 파일이 삭제되었습니다.${failedFiles > 0 ? ` (${failedFiles}개 파일 삭제 실패)` : ''}`
+    });
   } catch (err) {
     console.error('delete-records error:', err);
     return res.status(500).json({ ok: false, message: '삭제 처리 중 오류가 발생했습니다.' });
