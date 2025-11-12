@@ -26,15 +26,17 @@ scenarios:
       - function: setupRegisterRequest
       - post:
           url: "/api/attend/register"
-          formData:
-            employeeId: "{{ employeeId }}"
-            name: "{{ employeeName }}"
-            deviceId: "{{ deviceId }}"
-            photo:
-              value: "{{ photoPath }}"
-              options:
-                filename: "loadtest-photo.jpg"
-                contentType: "image/jpeg"
+          multipart:
+            - name: "employeeId"
+              value: "{{ employeeId }}"
+            - name: "name"
+              value: "{{ employeeName }}"
+            - name: "deviceId"
+              value: "{{ deviceId }}"
+            - name: "photo"
+              file: "{{ photoPath }}"
+              filename: "loadtest-photo.jpg"
+              contentType: "image/jpeg"
           capture:
             - json: "$.ok"
               as: "responseOk"
