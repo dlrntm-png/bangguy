@@ -44,7 +44,13 @@
 artillery run tests/load/register.yml
 ```
 
-- **시나리오**: 초당 10명 → 20명 → 30명 단계적으로 6분간 요청
+**상세 리포트 생성 (권장)**:
+```bash
+artillery run tests/load/register.yml --output register-report.json
+```
+생성된 `register-report.json` 파일을 열어 각 요청의 상세 응답을 확인할 수 있습니다.
+
+- **시나리오**: 초당 5명 → 10명 → 20명 단계적으로 2분간 요청
 - **내용**: 무작위 사번·이름·기기 ID, 준비한 이미지 파일로 `/api/attend/register`를 호출
 - **결과 해석**: `latency`, `errors` 항목을 확인하고, 테스트 시간대에 Vercel Functions / Neon Metrics에서 에러 및 커넥션 수를 모니터링하세요.
 

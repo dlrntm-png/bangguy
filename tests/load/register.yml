@@ -1,9 +1,15 @@
 config:
   target: "{{ $processEnvironment.BASE_URL }}"
   phases:
-    - duration: 10
-      arrivalRate: 2
-      name: quick-test
+    - duration: 30
+      arrivalRate: 5
+      name: ramp-up
+    - duration: 60
+      arrivalRate: 10
+      name: sustained
+    - duration: 30
+      arrivalRate: 20
+      name: stress
   defaults:
     headers:
       User-Agent: bangguy-loadtest
@@ -29,8 +35,19 @@ scenarios:
               options:
                 filename: "loadtest-photo.jpg"
                 contentType: "image/jpeg"
-      - log: "Request sent - employeeId: {{ employeeId }}, deviceId: {{ deviceId }}"
-      - log: "Response status: {{ $statusCode }}"
-      - log: "Response body: {{ $responseBody }}"
+          capture:
+            - json: "$.ok"
+              as: "responseOk"
+            - json: "$.reason"
+              as: "errorReason"
+            - json: "$.error"
+              as: "errorCode"
+            - json: "$.message"
+              as: "errorMessage"
+          expect:
+            - statusCode: [200, 400]  # 200 또는 400 모두 허용 (서버가 ok: false일 때도 200 반환)
+            - contentType: json
+      - log: "Request - employeeId: {{ employeeId }}, deviceId: {{ deviceId }}"
+      - log: "Response - ok: {{ responseOk }}, reason: {{ errorReason }}, error: {{ errorCode }}, message: {{ errorMessage }}"
       - think: 1
 
