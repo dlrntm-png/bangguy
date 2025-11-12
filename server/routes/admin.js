@@ -18,7 +18,7 @@ import { buildCsv } from '../../lib/csv.js';
 import { listBlobs, getStorageUsage, createSignedBlobDownload } from '../../lib/blob.js';
 import { getConsentLogs } from '../../lib/consent.js';
 import { getAllowedIps, addAllowedIp, removeAllowedIp } from '../../lib/db.js';
-import { invalidateAllowedIpsCache, getClientIp } from '../../lib/ip.js';
+import { invalidateAllowedIpsCache, refreshAllowedIpsCache, getClientIp } from '../../lib/ip.js';
 
 const router = express.Router();
 
@@ -585,7 +585,9 @@ router.post('/allowed-ips', requireAdmin, async (req, res) => {
 
   try {
     const ip = await addAllowedIp(ip_cidr.trim(), description || null, 'admin');
-    invalidateAllowedIpsCache(); // 캐시 무효화
+    // 캐시 무효화 후 즉시 재로드
+    invalidateAllowedIpsCache();
+    await refreshAllowedIpsCache();
     return res.status(200).json({ ok: true, ip, message: 'IP가 추가되었습니다.' });
   } catch (err) {
     console.error('[admin] add allowed ip error:', err);
@@ -606,7 +608,9 @@ router.delete('/allowed-ips/:id', requireAdmin, async (req, res) => {
 
   try {
     await removeAllowedIp(id);
-    invalidateAllowedIpsCache(); // 캐시 무효화
+    // 캐시 무효화 후 즉시 재로드
+    invalidateAllowedIpsCache();
+    await refreshAllowedIpsCache();
     return res.status(200).json({ ok: true, message: 'IP가 삭제되었습니다.' });
   } catch (err) {
     console.error('[admin] remove allowed ip error:', err);
