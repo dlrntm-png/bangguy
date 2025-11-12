@@ -139,22 +139,25 @@ router.get('/records', requireAdmin, async (req, res) => {
       startISO: range?.start,
       endISO: range?.end
     });
-    // 사진 URL 생성 (B2 사용 시 signed URL 필요할 수 있음)
+    // 사진 URL 생성 (B2 사용 시 프록시 URL 사용하여 CORS 문제 해결)
     const mapped = await Promise.all(records.map(async (row) => {
       let photoUrl = row.photo_url;
       
-      // B2를 사용하고 pathname만 있는 경우 프록시 URL 사용 (CORS 문제 해결)
+      // B2를 사용하고 pathname이 있는 경우 항상 프록시 URL 사용 (CORS 문제 해결)
       if (row.photo_blob_path && process.env.B2_ENDPOINT) {
         // Public URL이 있으면 우선 사용
         const publicUrl = getPublicUrl(row.photo_blob_path);
         if (publicUrl) {
           photoUrl = publicUrl;
-        } else if (!photoUrl || photoUrl === row.photo_blob_path || !photoUrl.startsWith('http')) {
-          // Public URL이 없으면 프록시 URL 사용 (CORS 문제 해결)
+        } else {
+          // Public URL이 없으면 항상 프록시 URL 사용 (signed URL 대신)
           // pathname을 URL 인코딩하여 프록시 경로 생성
           const encodedPath = encodeURIComponent(row.photo_blob_path);
           photoUrl = `/api/admin/photo/${encodedPath}`;
         }
+      } else if (row.photo_blob_path && !photoUrl.startsWith('http')) {
+        // 파일 시스템 사용 시 상대 경로로 변환
+        photoUrl = `/storage/${row.photo_blob_path.replace(/^\/+/, '')}`;
       }
       
       return {
