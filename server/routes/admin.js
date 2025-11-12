@@ -148,7 +148,8 @@ router.get('/records', requireAdmin, async (req, res) => {
         // URL이 pathname 형식이거나 없으면 signed URL 생성
         if (!photoUrl || photoUrl === row.photo_blob_path || !photoUrl.startsWith('http')) {
           try {
-            const signedUrl = await createSignedBlobDownload(row.photo_blob_path, 3600); // 1시간 유효
+            // 1년 유효 signed URL 생성 (브라우저 캐시 최대 활용)
+            const signedUrl = await createSignedBlobDownload(row.photo_blob_path, 31536000); // 1년 유효
             photoUrl = signedUrl.url;
           } catch (err) {
             console.warn('[admin/records] Signed URL 생성 실패:', err.message);

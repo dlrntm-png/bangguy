@@ -873,7 +873,10 @@
                 <img src="${imageUrl}"
                      alt="미리보기"
                      class="photo-preview"
-                     onclick="showImageModal('${imageUrl}', '사진 미리보기')" />
+                     onclick="showImageModal('${imageUrl}', '사진 미리보기')"
+                     loading="lazy"
+                     decoding="async"
+                     crossorigin="anonymous" />
               </div>
             ` : '<span style="color: #999;">-</span>'}
           </td>
@@ -900,6 +903,9 @@
       
       const img = document.createElement('img');
       img.src = imageUrl;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.crossOrigin = 'anonymous';
       img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);';
       img.onclick = (e) => e.stopPropagation();
       
