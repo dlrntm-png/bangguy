@@ -32,7 +32,18 @@
     .status-approved { background: #d4edda; color: #155724; }
     .status-rejected { background: #f8d7da; color: #721c24; }
     .loading { opacity: 0.6; pointer-events: none; }
-    .photo-preview { max-width: 80px; max-height: 80px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: transform 0.2s; display: block; }
+    .photo-preview {
+      width: auto;
+      height: 120px;
+      max-width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      display: block;
+      object-fit: cover;
+      object-position: center;
+    }
     .photo-preview:hover { transform: scale(1.05); }
     .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
     .name-cell { max-width: 120px; }
@@ -107,8 +118,7 @@
       .records-table td.emp-cell { grid-area: emp; }
       .records-table td.name-cell { grid-area: name; }
       .records-table td.photo-cell { grid-area: photo; text-align: center; }
-      .photo-preview { max-width: 60px; max-height: 60px; }
-      .photo-meta { display: none; }
+      .photo-preview { height: 96px; }
       .section-header { flex-direction: row; align-items: center; }
       .section-header h3 { font-size: 18px; }
       .section-header-actions { gap: 6px; font-size: 11px; }
@@ -608,26 +618,10 @@
         }
       };
 
-      const formatSize = (bytes) => {
-        if (!bytes) return '-';
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let value = Number(bytes);
-        let unitIndex = 0;
-        while (value >= 1024 && unitIndex < units.length - 1) {
-          value /= 1024;
-          unitIndex += 1;
-        }
-        return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[unitIndex]}`;
-      };
-
       let html = '<table><thead><tr><th style="width: 42px;">선택</th><th>시간</th><th>사번</th><th>이름</th><th>사진</th><th>상태 / 작업</th></tr></thead><tbody>';
       records.forEach(record => {
         const imageUrl = record.file || '';
         const hasImage = Boolean(imageUrl);
-        const sizeLabel = record.photo_size ? formatSize(record.photo_size) : '-';
-        const resolutionLabel = record.photo_width && record.photo_height
-          ? `${record.photo_width}×${record.photo_height}`
-          : '-';
         const cleanupTime = record.photo_deleted_at
           ? '사진 삭제됨'
           : record.cleanup_scheduled_at
@@ -649,14 +643,11 @@
           </td>
           <td class="photo-cell">
             ${hasImage ? `
-              <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 4px;">
+              <div style="display: inline-flex; flex-direction: column; align-items: center;">
                 <img src="${imageUrl}"
                      alt="미리보기"
                      class="photo-preview"
                      onclick="showImageModal('${imageUrl}', '사진 미리보기')" />
-                <div class="photo-meta" style="font-size: 0.75em; color: #666;">
-                  ${sizeLabel} · ${resolutionLabel}
-                </div>
               </div>
             ` : '<span style="color: #999;">-</span>'}
           </td>
