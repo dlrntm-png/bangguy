@@ -34,15 +34,17 @@
     .loading { opacity: 0.6; pointer-events: none; }
     .photo-preview {
       width: auto;
-      height: 120px;
+      height: 72px;
       max-width: 100%;
-      border: 1px solid #ddd;
+      border: 1px solid #d4d4d8;
       border-radius: 6px;
       cursor: pointer;
       transition: transform 0.2s;
       display: block;
-      object-fit: cover;
+      object-fit: contain;
       object-position: center;
+      background: #fff;
+      image-orientation: from-image;
     }
     .photo-preview:hover { transform: scale(1.05); }
     .truncate { max-width: 120px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
@@ -118,7 +120,7 @@
       .records-table td.emp-cell { grid-area: emp; }
       .records-table td.name-cell { grid-area: name; }
       .records-table td.photo-cell { grid-area: photo; text-align: center; }
-      .photo-preview { height: 96px; }
+      .photo-preview { height: 64px; }
       .section-header { flex-direction: row; align-items: center; }
       .section-header h3 { font-size: 18px; }
       .section-header-actions { gap: 6px; font-size: 11px; }
