@@ -150,14 +150,16 @@ router.get('/records', requireAdmin, async (req, res) => {
         if (publicUrl) {
           photoUrl = publicUrl;
         } else {
-          // Public URL이 없으면 항상 프록시 URL 사용 (signed URL 대신)
+          // Public URL이 없으면 항상 프록시 URL 사용 (signed URL 무시)
           // pathname을 URL 인코딩하여 프록시 경로 생성
           const encodedPath = encodeURIComponent(row.photo_blob_path);
           photoUrl = `/api/admin/photo/${encodedPath}`;
         }
-      } else if (row.photo_blob_path && !photoUrl.startsWith('http')) {
+      } else if (row.photo_blob_path) {
         // 파일 시스템 사용 시 상대 경로로 변환
-        photoUrl = `/storage/${row.photo_blob_path.replace(/^\/+/, '')}`;
+        if (!photoUrl || !photoUrl.startsWith('http')) {
+          photoUrl = `/storage/${row.photo_blob_path.replace(/^\/+/, '')}`;
+        }
       }
       
       return {
