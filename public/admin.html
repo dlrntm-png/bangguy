@@ -79,10 +79,10 @@
     }
     .loading { opacity: 0.6; pointer-events: none; }
     .photo-preview {
-      width: auto;
+      width: 80px;
       height: 32px;
-      max-width: 120px;
-      max-height: 32px;
+      min-width: 80px;
+      min-height: 32px;
       border: 1px solid #d4d4d8;
       border-radius: 6px;
       cursor: pointer;
@@ -188,7 +188,12 @@
       .records-table td.emp-cell { grid-area: emp; }
       .records-table td.name-cell { grid-area: name; }
       .records-table td.photo-cell { grid-area: photo; text-align: center; }
-      .photo-preview { height: 48px; }
+      .photo-preview { 
+        width: 100px;
+        height: 48px;
+        min-width: 100px;
+        min-height: 48px;
+      }
       .section-header { flex-direction: row; align-items: center; }
       .section-header h3 { font-size: 18px; }
       .section-header-actions { gap: 6px; font-size: 11px; }
